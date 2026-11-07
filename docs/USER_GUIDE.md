@@ -130,3 +130,7 @@ The table shows the reason for each item and store view that fails; the other on
 | *Supertext does not translate from "…" into "…"* | Supertext doesn't offer that store view's Supertext language; ask your administrator to choose another one. |
 | *Supertext offers no formal or informal tone for this language* | The tone set for this store view isn't available at Supertext. Ask your administrator to set it to *Supertext default*. |
 | *The Supertext translation came back incomplete* | Nothing was saved for that item and store view. Click **Translate** again. |
+
+## Support
+
+Questions, problems or ideas: use the [Supertext support form](https://integrations.supertext.com/en/support?platform=magento). Mention the version of Magento and of the plugin, what you did and what you expected; an error message helps a lot. You get an answer by email, in your language.
