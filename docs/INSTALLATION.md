@@ -10,7 +10,7 @@ A ready-to-run container with Mage-OS 3.6 (Magento 2.4.9), English sample produc
 
 | | |
 | --- | --- |
-| Magento | Mage-OS 3.6 (Magento 2.4.9) tested; Magento Open Source and Adobe Commerce 2.4.7–2.4.9, Mage-OS 1.x–3.x supported, not yet tested |
+| Magento | Mage-OS 3.6 (Magento 2.4.9) and Mage-OS 4.0 tested; Magento Open Source and Adobe Commerce 2.4.7–2.4.9, Mage-OS 1.x–3.x supported, not yet tested. Mage-OS 4.0 needs PHP 8.3 or later |
 | PHP | Whatever your Magento version needs (8.2–8.5), with `ext-curl` (Magento requires it too) |
 | Store setup | A store view per language, each with its locale and, where the locale has no Supertext default, its Supertext language (step 3) |
 | Supertext | An account with an API key, see [Get a Supertext account and API key](#get-a-supertext-account-and-api-key) |

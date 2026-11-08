@@ -4,6 +4,7 @@ All notable changes to this project are documented here.
 
 ## Unreleased
 
+- Added: support for Mage-OS 4.0 (needs PHP 8.3 or later); CI now tests Mage-OS 3.6.0 and 4.0.0. The demo stays on Mage-OS 3.6.
 - Added: the Supertext support form is linked in the README, the user guide and GitHub's "New issue" page.
 - Changed: tested with Mage-OS 3.6 (Magento 2.4.9 compatible); the demo and CI now install Mage-OS 3.6.0 instead of 3.5.0.
 - Added: **Translation review** per store view (*Stores → Configuration → Supertext → Translation*, store view scope → *Language* → *Translation review*, next to the *Supertext language*): translations into a store view with it set to *Yes* go through Supertext's review service (Supertext Localization Review), where customers and Supertext linguists correct them on the storefront with a Chrome extension; corrections come back into Magento with the next translation (with *Overwrite existing translations*), and texts translated before keep their (reviewed) wording. Same API key, billing, languages and messages; other store views keep going directly to Supertext. New global setting *Review service URL* (`supertext/api/review_url`, `SUPERTEXT_REVIEW_URL`; defaults to Supertext's review service, empty turns review off everywhere). Existing shops start with review off. All four interface languages.
