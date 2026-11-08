@@ -2,6 +2,8 @@
 
 Translate Magento products, categories, CMS pages and blocks into your store views' languages with **Supertext AI**, straight from the admin lists and edit pages. Works with Magento Open Source, Adobe Commerce and Mage-OS.
 
+![Demo: in the Magento admin, an editor opens the English product “Dark chocolate praline box”, clicks Translate with Supertext, keeps the German and French store views, clicks Translate and opens the product in the store view Deutsch (Schweiz), now named “Pralinenbox mit dunkler Schokolade”](docs/images/demo.gif)
+
 Select products in *Catalog → Products* (or pages and blocks in *Content*), choose **Translate with Supertext** in the **Actions** menu, pick the store views and click **Translate**. Product and category texts are saved as each store view's own values, so they show up in that store view right away; pages and blocks get a translated copy per store view.
 
 - Works with Magento's own store views and locales: no extra multilingual extension needed

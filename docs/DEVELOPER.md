@@ -269,6 +269,28 @@ BASE_URL=http://localhost:8091/admin DEMO_ADMIN_EMAIL=… DEMO_ADMIN_PASSWORD=�
 
 `ONLY=admin` or `ONLY=editor` runs one part. Run it in the same commit as any UI change the images show.
 
+## Demo movie
+
+`docs/images/demo.gif` (shown at the top of the README) is recorded by `tests/docs/movie.mjs` with Supertext's movie kit (`tests/docs/movie/`: Playwright screencast → ffmpeg; intro and outro cards, captions, cursor; Inter font under the SIL Open Font License in `movie/assets/fonts/`). Like the screenshots, it needs a demo whose module talks to the stand-in API, `ffmpeg` and, for the voice, Piper:
+
+```bash
+pip install piper-tts                       # the voice; without it (or with MOVIE_VOICE=0) the movie is silent
+cd tests/docs && npm install
+node stand-in.mjs &                         # http://127.0.0.1:8765/v1/
+# a fresh demo as for the screenshots (SUPERTEXT_API_ENDPOINT=http://127.0.0.1:8765/v1/,
+# SUPERTEXT_REPORT_URL=http://127.0.0.1:8765/report, no SUPERTEXT_API_KEY), on port 8091:
+BASE_URL=http://localhost:8091/admin DEMO_ADMIN_EMAIL=… DEMO_ADMIN_PASSWORD=… npm run movie:install   # enters the key
+BASE_URL=http://localhost:8091/admin DEMO_EDITOR_EMAIL=… DEMO_EDITOR_PASSWORD=… npm run movie
+```
+
+**Demo movie** (`npm run movie`, about 48 seconds, 1280×720, an English voice and English captions): the demo editor opens the English product *Dark chocolate praline box*, clicks **Translate with Supertext** on its edit page, keeps *Deutsch (Schweiz)* and *Français (Suisse)* (unticks Italian), clicks **Translate** (the waiting time is cut), opens the product again and switches the scope to *Deutsch (Schweiz)*. It needs an API key in the configuration (the install movie or the screenshots enter one; the stand-in accepts any). The script writes the GIF (800 px, 12 fps, keep it under 3 MB) to `docs/images/demo.gif` and the MP4 to `tests/docs/movie/out/Magento-Supertext-Translation.mp4` (git-ignored; `MOVIE_OUT` changes the path). The MP4 is not committed; the GIF is silent. Re-record it in the same commit when the translate page changes.
+
+**Install and configuration movie** (`npm run movie:install`, about 93 seconds, MP4 only): the same kit, voice and look, for administrators, signed in as the demo **administrator** on a demo without an API key. A terminal (`kit.terminal()`) with the commands from `docs/INSTALLATION.md` (`composer config repositories…`, `composer require`, `module:enable`, `setup:upgrade`, `cache:flush`; output shortened), then *Stores → Configuration → Supertext → Translation*: where the key comes from (supertext.com → Integrations → API; create an account at supertext.com), the made-up key `st-demo-0000-0000-0000` in **Supertext API key**, **Save Config** and *API key checked: the connection to Supertext works.*, the *Store views* overview under **Language**, the scope *Deutsch (Schweiz)* with **Supertext language** *German (Switzerland) (de-CH)* and **Translation review** left at *No*, **Save Config**, and where editors find **Translate with Supertext** (*Catalog → Products* → *Actions*). The script keeps the *Supertext connection* group's lower part (with the ping address, a local URL in the demo) out of view. The MP4 goes to `tests/docs/movie/out/Magento-Supertext-Translation-install.mp4` (git-ignored, not committed; `MOVIE_OUT` changes the path). Re-record it when the installation steps or the *Supertext* configuration change.
+
+Page loads are cut from both movies (Magento's admin is slow on a local PHP server). The voice model (63 MB, pinned revision, checked by SHA-256) is downloaded once into `tests/docs/movie/voice-cache/` (git-ignored, never committed); the time spent generating speech is cut too. `CHROMIUM_PATH` points the scripts at another Chromium than Playwright's.
+
+Voice: Piper voice “alba” (en_GB), trained on a dataset from the University of Edinburgh's Centre for Speech Technology Research, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
 ## Code quality and security checks
 
 Before starting work in this repo, look at its open findings: code scanning alerts, secret scanning alerts, Dependabot PRs and the "Broken links in the docs" issue.
