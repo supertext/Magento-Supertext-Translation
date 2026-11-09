@@ -194,7 +194,7 @@ To translate without a Supertext key, run the stand-in API (`node tests/docs/sta
 ## Tests
 
 ```bash
-php phpunit.phar        # PHPUnit 10 (phar): SDK use and error messages, field planner, language codes, reporting, i18n files — no Magento needed
+php phpunit.phar        # PHPUnit 11 (phar): SDK use and error messages, field planner, language codes, reporting, i18n files — no Magento needed
 ./build.sh              # dist/magento-supertext-translation-<version>.zip
 ```
 
