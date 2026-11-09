@@ -19,11 +19,12 @@ use Supertext\Sdk\V1\Client;
 use Supertext\Sdk\V1\Politeness;
 use Supertext\Translation\Api\LanguageCodes;
 use Supertext\Translation\Api\Supertext;
+use Supertext\Translation\Api\SupertextClients;
 use Supertext\Translation\Api\SupertextException;
 
 /**
  * The module's settings (Stores → Configuration → Supertext → Translation), with the
- * environment variables SUPERTEXT_API_KEY and SUPERTEXT_API_ENDPOINT taking precedence,
+ * environment variables SUPERTEXT_API_KEY, SUPERTEXT_API_ENDPOINT and SUPERTEXT_REVIEW_URL taking precedence,
  * and the store views as translation targets.
  */
 class Config
@@ -34,6 +35,8 @@ class Config
     public const PATH_TIMEOUT     = 'supertext/api/timeout';
     public const PATH_CODE        = 'supertext/language/code';
     public const PATH_TONE        = 'supertext/language/tone';
+    public const PATH_REVIEW      = 'supertext/language/review';
+    public const PATH_REVIEW_URL  = 'supertext/api/review_url';
     public const PATH_CMS_STATUS  = 'supertext/cms/status';
     public const PATH_REPORTS     = 'supertext/api/version_reports';
 
@@ -95,6 +98,52 @@ class Config
         return Supertext::client($this->apiKey(), $this->baseUrl(), $this->timeout(), $this->version());
     }
 
+    /**
+     * The review service for store views with *Translation review* on: SUPERTEXT_REVIEW_URL when not
+     * empty, else the setting (default Supertext's review service; saved empty: review off for every
+     * store view).
+     */
+    public function reviewUrl(): string
+    {
+        $env = trim((string) getenv('SUPERTEXT_REVIEW_URL'));
+
+        if ($env !== '') {
+            return $env;
+        }
+
+        $value = $this->scopeConfig->getValue(self::PATH_REVIEW_URL);
+
+        return $value === null ? Supertext::REVIEW_URL : trim((string) $value);
+    }
+
+    public function reviewUrlFromEnvironment(): bool
+    {
+        return trim((string) getenv('SUPERTEXT_REVIEW_URL')) !== '';
+    }
+
+    /** The store view's *Translation review* setting (default off). */
+    public function review(int $storeId): bool
+    {
+        return (bool) (int) $this->scopeConfig->getValue(self::PATH_REVIEW, ScopeInterface::SCOPE_STORE, $storeId);
+    }
+
+    /**
+     * The clients for translations: direct, and for store views with *Translation review* on the
+     * review service (Api\SupertextClients::forReview()). Never for the key check, reports or files.
+     */
+    public function clients(): SupertextClients
+    {
+        $apiKey  = $this->apiKey();
+        $timeout = $this->timeout();
+        $version = $this->version();
+
+        return new SupertextClients(
+            static fn (string $baseUrl): Client => Supertext::client($apiKey, $baseUrl, $timeout, $version),
+            $this->baseUrl(),
+            $this->reviewUrl(),
+        );
+    }
+
     /** "same" (as the original) or "disabled" */
     public function cmsStatus(): string
     {
@@ -117,7 +166,8 @@ class Config
 
     /**
      * Sent to Supertext as target language: the store view's Supertext language, else its locale when
-     * that equals a Supertext code ("de_CH" → "de-CH"). No guessing, no default regions.
+     * that equals a Supertext code ("de_CH" → "de-CH"), else the SDK's default for it ("es_ES" → "es",
+     * "zh_Hans_CN" → "zh-Hans"). Locales without a default ("en_IE", "de_LI") need the setting.
      *
      * @throws SupertextException unsupported_language (nothing is sent)
      */
@@ -126,7 +176,7 @@ class Config
         return LanguageCodes::target($this->locale($storeId), $this->languageSetting($storeId));
     }
 
-    /** The target code, or null when the store view has no Supertext language. */
+    /** The target code, or null when the store view has neither a Supertext language nor a default. */
     public function targetCodeOrNull(int $storeId): ?string
     {
         return LanguageCodes::targetOrNull($this->locale($storeId), $this->languageSetting($storeId));
@@ -193,9 +243,11 @@ class Config
 
     /**
      * Store views that can be translated into, with their language. `target` is null for a store
-     * view without a Supertext language (it can't be translated into).
+     * view with neither a Supertext language nor a default for its locale (it can't be translated
+     * into); `origin` says where the target comes from: "setting", "locale" (the locale is a
+     * Supertext code) or "default" (the SDK's default for the locale).
      *
-     * @return list<array{id: int, name: string, code: string, website: string, locale: string, setting: string, target: ?string, active: bool, sameLanguage: bool, tone: string, toneIgnored: bool}>
+     * @return list<array{id: int, name: string, code: string, website: string, locale: string, setting: string, target: ?string, origin: string, active: bool, sameLanguage: bool, tone: string, review: bool, toneIgnored: bool}>
      */
     public function storeViews(): array
     {
@@ -214,9 +266,11 @@ class Config
                 'locale'       => $this->locale($id),
                 'setting'      => $this->languageSetting($id),
                 'target'       => $target,
+                'origin'       => $this->languageSetting($id) !== '' ? 'setting' : (LanguageCodes::isExactMatch($this->locale($id)) ? 'locale' : 'default'),
                 'active'       => (bool) $store->getIsActive(),
                 'sameLanguage' => $target !== null && $source !== null && LanguageCodes::sourceOrNull($target) === $source,
                 'tone'         => $tone,
+                'review'       => $this->review($id),
                 'toneIgnored'  => $tone !== Politeness::DEFAULT && $target !== null && LanguageCodes::supportsPoliteness($target) === false,
             ];
         }

@@ -99,9 +99,11 @@ class CmsTranslator
     /**
      * @return array{status: string, title: string, translated: list<string>, kept: list<string>, notes: list<string>, targetId?: int}
      *
+     * @param Client|\Closure(array<string, \Supertext\Sdk\V1\Segment>): array<string, string> $client the texts of a translation file instead of Supertext
+     *
      * @throws SupertextException|\Supertext\Sdk\V1\SupertextException|LocalizedException on failure (Translator turns SDK errors into messages)
      */
-    public function translate(Client $client, string $type, int $id, int $storeId, bool $overwrite): array
+    public function translate(Client|\Closure $client, string $type, int $id, int $storeId, bool $overwrite): array
     {
         $fields = EntityTypes::get($type)['fields'];
         $source = $this->load($type, $id);
@@ -120,7 +122,8 @@ class CmsTranslator
             return ['status' => 'unchanged', 'title' => $title, 'translated' => [], 'kept' => $planner->kept(), 'notes' => []];
         }
 
-        $values = $planner->apply($client->translateTexts(
+        // A translation file brings its own texts (Translator::importTexts()); otherwise Supertext translates.
+        $values = $planner->apply($client instanceof \Closure ? $client($planner->segments()) : $client->translateTexts(
             $planner->segments(),
             $this->config->targetCode($storeId),
             $this->config->sourceCode(),
@@ -183,6 +186,16 @@ class CmsTranslator
             'notes'      => $notes,
             'targetId'   => (int) $target->getId(),
         ];
+    }
+
+    /** What translate() would send and keep, for a translation file. */
+    public function planner(string $type, int $id, int $storeId, bool $overwrite): FieldPlanner
+    {
+        $fields = EntityTypes::get($type)['fields'];
+        $source = $this->load($type, $id);
+        $target = $this->target($type, $source, $storeId);
+
+        return new FieldPlanner($fields, $this->values($source, $fields), $target === null ? [] : $this->values($target, $fields), $overwrite);
     }
 
     /** The existing translation: linked, or a page/block with the same identifier assigned only to that store view. */

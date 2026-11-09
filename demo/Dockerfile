@@ -1,4 +1,4 @@
-# Supertext Magento demo: Mage-OS 3.5 (Magento Open Source 2.4.9 compatible) + this module,
+# Supertext Magento demo: Mage-OS 3.6 (Magento Open Source 2.4.9 compatible) + this module,
 # with store views for German (CH), French (CH) and Italian (CH).
 # Build context is the repository root:
 #   docker build -f demo/Dockerfile -t supertext-magento-demo .
@@ -20,7 +20,7 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # --- Mage-OS, downloaded at build time (no Adobe Marketplace keys needed) ---------------
 FROM base AS magento
-ARG MAGEOS_VERSION=3.5.0
+ARG MAGEOS_VERSION=3.6.0
 ENV COMPOSER_ALLOW_SUPERUSER=1 COMPOSER_MEMORY_LIMIT=-1
 RUN composer create-project --no-interaction --no-progress --no-dev \
       --repository-url=https://repo.mage-os.org/ "mage-os/project-community-edition:${MAGEOS_VERSION}" /var/www/magento \

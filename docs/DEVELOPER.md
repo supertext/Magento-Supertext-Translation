@@ -12,7 +12,8 @@ Magento 2 module `Supertext_Translation` (PHP 8.2+, Magento Open Source / Adobe 
 ├── lib/supertext-plugin-health/          Supertext Plugin Health for PHP, vendored (don't edit; see *Supertext Plugin Health*)
 ├── Api/                                  no Magento classes (unit-tested on their own)
 │   ├── Supertext.php                     the SDK client with the module's defaults, SDK errors → messages
-│   ├── LanguageCodes.php                 locales → Supertext codes (the SDK's Languages + the store view setting; no guessing)
+│   ├── SupertextClients.php              direct client + review service client (Translation review)
+│   ├── LanguageCodes.php                 locales → Supertext codes (the SDK's Languages + the store view setting; only the SDK's defaults)
 │   ├── Reporting.php                     Commando Center: Plugin Health's InstallationReporter with the module's state
 │   ├── ReportTransport.php               Plugin Health's HTTP over an SDK transport (the tests' fake)
 │   └── SupertextException.php            translatable message (English template, %1 parameters, detail)
@@ -25,9 +26,11 @@ Magento 2 module `Supertext_Translation` (PHP 8.2+, Magento Open Source / Adobe 
 │   │   ├── Directives.php                protects {{…}} directives in rich text (no Magento classes)
 │   │   ├── EavTranslator.php             products, categories: store-view values, URL key, rewrites
 │   │   ├── CmsTranslator.php             pages, blocks: copies per store view + supertext_translation_link
-│   │   └── Translator.php                entry point for the admin and the console command
+│   │   ├── Translator.php                entry point for the admin and the console command (also importTexts() for files)
+│   │   ├── FileExchange.php, FileItems.php   Export for translation / Import translation (no Magento classes)
+│   │   └── TranslationFileItems.php      FileItems for Magento: Translator, store views, ACL
 │   └── Config/Backend|Source/            API key (encrypted), Supertext language (list + saved code), option lists
-├── Controller/Adminhtml/Translate/       Index (the page), Mass (grid mass action → page), Run (JSON)
+├── Controller/Adminhtml/Translate/       Index (the page), Mass (grid mass action → page), Run (JSON), Export (file download), Import (JSON)
 ├── Controller/Adminhtml/System/Test.php  "Test connection" (the API key check)
 ├── Controller/Ping/Index.php             public GET /supertext/ping (Commando Center)
 ├── Observer/                             SettingsSaved (key check + report after a save), SettingsPage (onRequest)
@@ -55,9 +58,19 @@ Entry points:
 
 The translate page (`Block\Adminhtml\Translate` + `translate.phtml`) shows the items and, per store view, a state from `FieldPlanner::state()`. Its script then posts to `Run` once per item and store view, one after the other (Supertext rate-limits per second), with `form_key`, `type`, `id`, `store`, `overwrite`. `Run` checks the ACL resource of the type (`Magento_Catalog::products`, `Magento_Catalog::categories`, `Magento_Cms::save`, `Magento_Cms::block`) on top of `Supertext_Translation::translate`.
 
+### Translation files
+
+*Export for translation* and *Import translation* on the translate page: the items' texts as an XLIFF 1.2 or HTML file, translated outside the API (a CAT tool, a translator, Supertext's web app), and the translated file written back. File formats, checksums and the safety checks of imported files are the SDK's `Supertext\Sdk\Files\TranslationFiles` (SDK 0.5.0, integration guide → *Translation files: XLIFF and HTML*); the module only collects, finds and writes back.
+
+- **Core** (`Model/Translation/FileExchange.php`, no Magento classes, `Test/Unit/FileExchangeTest.php`): `export()` builds one SDK `FileJob` per item and store view from exactly the segments an API translation sends (`FileItems::segments()` = `Translator::fileSegments()` = `FieldPlanner::segments()` of `EavTranslator::planner()` / `CmsTranslator::planner()`: the same fields, rich text with its `{{…}}` directives protected, existing translations left out unless *overwrite*); keys are the attribute codes / CMS fields. XLIFF holds every selected item and store view; HTML exactly one item in one store view. `import()` refuses files over 10,000,000 bytes, `read()`s the file and per job checks `plugin` (`Magento-Supertext-Translation`, else *another system*), parses `reference` (else *no longer exists*), checks the store view exists and the admin's ACL for the type, loads the item (missing → *no longer exists*), collects the current segments the same way and calls `importTranslations()`. `ok` results (and `source_changed` with *include changed*) go through `Translator::importTexts()`, which runs `EavTranslator::translate()` / `CmsTranslator::translate()` with a closure returning the file's texts instead of the SDK client: the same write-back (store-view values via `saveAttribute`, URL key and rewrites, CMS copies per store view and `supertext_translation_link`, *disabled* for review). `untranslated`, `invalid_markup` and `missing` are only counted; *kept* counts the file's fields that got a translation since the export.
+- **Reference** of a job: `<type>:<id>:store-<store view id>`, e.g. `product:42:store-2`, `cms_page:5:store-3` (`FileExchange::reference()` / `parseReference()`; ids, never titles or store codes).
+- **Languages in the file:** source = `Config::sourceCodeOrNull()`, target = `Config::targetCodeOrNull($storeId)`; a store view with neither a Supertext language nor a default is written with its locale and `-` (`en_IE` → `en-IE`), so it never blocks the export.
+- **File names:** `magento-<type>-<id>-store-<id>.xlf` / `.html`, `magento-<type>-<id>.xlf` for several store views, `magento-<type>-<id>-and-<n>-more.xlf` for several items. `Content-Type` `application/x-xliff+xml` / `text/html; charset=utf-8`, `Content-Disposition: attachment`.
+- **Controllers:** `Export` (POST form with `form_key`, `type`, `ids`, `stores[]`, `format`, `overwrite`; the page's script copies the ticked store views and *Overwrite* into the form) answers the file or redirects back with the error; `Import` (POST `multipart/form-data` with `form_key`, `file`, `include_changed`, `overwrite`, sent by the page's script) checks the upload size before reading, reads PHP's temporary upload in memory and answers a JSON summary per job, which the script shows. Both need `Supertext_Translation::translate`; `Export` also the type's ACL, `Import` the ACL of each job's type.
+
 ### Languages
 
-The source is always the **default values** (store id 0), in the language of the default locale (`general/locale/code` at default scope; only the language is sent, e.g. `en`). Targets are the store views: `supertext/language/code` (store scope, the *Supertext language*) if set, else the store view's `general/locale/code` when it equals a Supertext code; see *Language codes*. Store views whose language equals the source's are listed but not ticked, and the console command skips them without `--store`; store views without a Supertext language can't be ticked. Tone: `supertext/language/tone` (store scope), sent only where `Languages::supportsPoliteness()` is true (`Config::tone()`).
+The source is always the **default values** (store id 0), in the language of the default locale (`general/locale/code` at default scope; only the language is sent, e.g. `en`). Targets are the store views: `supertext/language/code` (store scope, the *Supertext language*) if set, else the store view's `general/locale/code` when it equals a Supertext code, else the SDK's default for it (`es_ES` → `es`); see *Language codes*. Store views whose language equals the source's are listed but not ticked, and the console command skips them without `--store`; store views with neither a Supertext language nor a default can't be ticked. Tone: `supertext/language/tone` (store scope), sent only where `Languages::supportsPoliteness()` is true (`Config::tone()`).
 
 ### What is translated
 
@@ -111,7 +124,9 @@ AI file translation API v1, same as the WordPress, PrestaShop and other Supertex
 - HTTP 429 (`RATE_LIMIT_EXCEEDED`, per second per key) is retried up to 4 times, after `Retry-After` or 1/2/4/8 s with jitter.
 - The API key check (*Save Config*, *Test connection*, see *Commando Center*) calls `GET {base}/features` (free).
 - Documents stay below 900,000 characters (API limit 1,000,000); the SDK splits larger items into several documents.
-- The SDK identifies the module in the `User-Agent` (`supertext-sdk-php Magento-Supertext-Translation/<version>`) and keeps the key out of error messages.
+- The SDK identifies the module in the `User-Agent` (`supertext-sdk-php Magento-Supertext-Translation/<version>`, the version from `composer.json` as in the reports) and keeps the key out of error messages.
+
+**Translation review** (`supertext/language/review`, a Yes/No select per store view next to the *Supertext language*, default *No* in `etc/config.xml`; no migration, existing shops start with review off): `Translator::translate()` takes `Config::clients()->forReview(Config::review($storeId))`. `Api\SupertextClients` (no Magento classes) holds the direct client and, created on first use, a second SDK client with the same key, timeout, transport and User-Agent whose base URL is `Config::reviewUrl()`: `SUPERTEXT_REVIEW_URL` when not empty, else `supertext/api/review_url` (*Review service URL*, default `Supertext::REVIEW_URL`, the translation proxy of Supertext Localization Review). Every translation is one `translateTexts()` round trip (upload, status, download, delete) with one client, so a job is always collected with the client that submitted it. The proxy speaks the same API v1, forwards to the live Supertext API with the module's key, stores every segment per key and serves reviewers' corrections on the next upload, so nothing else changes in the module. A review URL that is empty or the same as the API's (`Supertext::reviewBaseUrl()`) means no second client. The key check, *Test connection*, reports and translation files never use the review service (they use `Config::baseUrl()`). The *Store views* overview marks store views with review on. Tests: `SupertextClientsTest` (review store views: all four calls to the review URL with the same key and User-Agent, others directly, one review client, empty or same URL turns it off, `etc/config.xml` defaults to Supertext's review service with review off).
 
 ### Supertext SDK
 
@@ -133,11 +148,11 @@ Supertext calls go through the [Supertext SDK for PHP](https://github.com/Supert
 
 Supertext accepts exactly the codes its `GET features` lists (the SDK's `Supertext\Sdk\V1\Languages`, from the live API): bare sources (`en`, `de`); targets in one exact form each, regional for German, English, French, Italian and Portuguese (`de-CH`, `en-US`, `pt-BR`), with a script for Chinese and Serbian (`zh-Hans`, `sr-Latn`), a dialect for Swiss German (`gsw-u-sd-chzh`), bare for the others (`es`, `nl`, `sl`). Anything else is HTTP 404 `INVALID_LANGUAGE_PAIR`; formal/informal for a target without it (`en-US`, `rm`, …) is HTTP 400 `FEATURE_ERROR` (`unsupported_feature`).
 
-`Api/LanguageCodes.php` (unit-tested, no Magento classes) turns a store view into Supertext codes **without guessing**, with the store view's *Supertext language* (`supertext/language/code`, store scope; a select of `LanguageCodes::targets()` via `Model\Config\Source\TargetLanguage`) as the SDK's mapping:
+`Api/LanguageCodes.php` (unit-tested, no Magento classes) turns a store view into Supertext codes with the SDK's `Languages::target()`/`source()`, the store view's *Supertext language* (`supertext/language/code`, store scope) being the SDK's mapping. The setting is a Magento select: `Model\Config\Source\TargetLanguage` lists `LanguageCodes::options()` (the SDK's `targetOptions()` as *Name (code)*, the name from intl's `Locale::getDisplayName()` in the admin's interface locale, English for English and the Swiss German dialects, sorted with `Collator`); `Block\Adminhtml\System\Config\LanguageSelect` relabels the empty option for the store view shown (`Languages::suggestTarget()` of its locale: *Default: Spanish (es)*, or *– Choose –* when there is none); `Model\Config\Backend\LanguageCode` accepts only codes from the list (stored as Supertext writes them), except an unchanged older value.
 
-- **Target** (`Config::targetCode()`): the setting (sent as it is, even a code the SDK's list doesn't know yet); else the locale when it equals a Supertext code apart from case and `_`/`-` (`de_CH` → `de-CH`, `fr_FR` → `fr-FR`); else `SupertextException` from the SDK code `unsupported_language` (*The language "%1" has no Supertext language yet …*), and nothing is sent. No default regions: `es_ES`, `nl_NL`, `sl_SI`, `zh_Hans_CN` need the setting. `Translator` resolves both codes before it creates the client.
+- **Target** (`Config::targetCode()`): the setting (sent as it is, even a code the SDK's list doesn't know); else the locale when it equals a Supertext code apart from case and `_`/`-` (`de_CH` → `de-CH`, `fr_FR` → `fr-FR`); else the SDK's default (`defaultTarget()`: a region of a bare target → the bare target, `es_ES` → `es`, `nb_NO` → `nb`; `zh_Hans_CN` → `zh-Hans`, `zh_Hant_TW` → `zh-Hant`, `sr_Latn_RS` → `sr-Latn`; bare `de`/`en`/`fr`/`it`/`pt` → `de-DE`/`en-US`/`fr-FR`/`it-IT`/`pt-PT`); else `SupertextException` from the SDK code `unsupported_language` (*The language "%1" has no Supertext language yet. … in the Supertext language list …*), and nothing is sent. Regions Supertext doesn't offer (`en_IE`, `de_LI`, `fr_BE`, `sr_RS`) are never guessed. An empty setting therefore means "the default"; there is no stored copy of it, so a later SDK default applies without migration. `Translator` resolves both codes before it creates the client.
 - **Source** (`Config::sourceCode()`): the default locale's language (`en_US`, `en_GB` → `en`); one mapping serves both directions, so the default store view's setting counts when that store view has the default locale (`de-CH` → `de`). Unknown: `unsupported_language` with `sourceLang`.
-- `Config::storeViews()` gives each store view's `target` (null when unmapped), which the *Store views* overview (`Block\Adminhtml\System\Config\LanguageOverview`, default scope), the store-view field's note (`LanguageSelect`, which also keeps a saved code that isn't in the list as an extra option) and the translate page (unmapped store views can't be ticked) show.
+- `Config::storeViews()` gives each store view's `target` (null only without setting, exact match or default) and `origin` (`setting`, `locale` or `default`), which the *Store views* overview (`Block\Adminhtml\System\Config\LanguageOverview`, default scope), the store-view field's note (`LanguageSelect`, which also keeps a saved code that isn't in the list as an extra option) and the translate page (unmapped store views can't be ticked) show.
 - Tone: `Config::tone()` sends `more`/`less` only where `LanguageCodes::supportsPoliteness()` is true; elsewhere `default`, and the overview says so.
 - Translating within one language (source `en`, target `en-GB`) is allowed.
 
@@ -160,7 +175,7 @@ Mage-OS installs without Adobe Marketplace keys (Magento Open Source from `repo.
 ```bash
 docker run -d --name mysql -p 3306:3306 -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=magento mysql:8.4
 docker run -d --name es -p 9200:9200 -e discovery.type=single-node -e xpack.security.enabled=false elasticsearch:8.17.10
-composer create-project --repository-url=https://repo.mage-os.org/ mage-os/project-community-edition:3.5.0 magento
+composer create-project --repository-url=https://repo.mage-os.org/ mage-os/project-community-edition:3.6.0 magento
 cd magento
 bin/magento setup:install --base-url=http://127.0.0.1:8082/ --db-host=127.0.0.1 --db-name=magento --db-user=root \
   --db-password=root --search-engine=elasticsearch8 --elasticsearch-host=127.0.0.1 --admin-user=admin \
@@ -188,9 +203,10 @@ The module's `composer.json` requires `magento/*` packages, which aren't on Pack
 CI (`.github/workflows/ci.yml`):
 
 - **unit** (PHP 8.2, 8.3, 8.4, 8.5): lint (`.php`, `.phtml`), PHPUnit, XML well-formedness, `sh -n demo/entrypoint.sh`, `./build.sh`.
-- **phpstan**: PHPStan on the module's code with Mage-OS's classes (see *Code quality and security checks*).
-- **magento**: downloads Mage-OS, installs it with MySQL 8.4 and Elasticsearch 8, adds the module in `app/code`, runs `demo/setup.php` twice (the second run must change nothing, and no password may appear in the log), translates the sample product, category, page and block with `supertext:translate` against the stand-in and checks the store values, URL key and rewrite, page copy with Page Builder markup, block directives, link table and accounts; a second run must skip everything. Then it checks the Commando Center: exactly one `installed` report (plugin, key check `ok`, callback URL; never the key) reached the stand-in's fake center, the state is in the `flag` table, and the storefront's ping (through PHP's built-in server and `phpserver/router.php`) answers the challenge with `Cache-Control: no-store` (400 for a bad challenge).
+- **phpstan**: PHPStan on the module's code with Mage-OS's classes, once with Mage-OS 3.6.0 and once with 4.0.0 (see *Code quality and security checks*).
+- **magento** (Mage-OS 3.6.0 and 4.0.0): downloads Mage-OS, installs it with MySQL 8.4 and Elasticsearch 8, adds the module in `app/code`, runs `demo/setup.php` twice (the second run must change nothing, and no password may appear in the log), translates the sample product, category, page and block with `supertext:translate` against the stand-in and checks the store values, URL key and rewrite, page copy with Page Builder markup, block directives, link table and accounts; a second run must skip everything. Then it checks the Commando Center: exactly one `installed` report (plugin, key check `ok`, callback URL; never the key) reached the stand-in's fake center, the state is in the `flag` table, and the storefront's ping (through PHP's built-in server and `phpserver/router.php`) answers the challenge with `Cache-Control: no-store` (400 for a bad challenge).
 
+Unit tests worth knowing: `FileExchangeTest` (translation files: reference and file names, export with the planner's segments and the codes, HTML with one item and one store view, errors, import with another plugin, an unknown reference or store view, no ACL, `ok` written through the planner with directives unprotected, `source_changed` only with the option, `untranslated`/`invalid_markup`/`missing` never written, kept fields, a save error, files too large, invalid or without metadata), `LanguageCodesTest` (exact matches, the SDK defaults, no guessing without a default, the select's options and localized names, the setting wins, sources, `unsupported_language`), `ReportingTest` (the report and the stored state never contain the key, the SDK version reported, a state stored by the SDK 0.2 reporter kept without a new report, `installed` → `settings_saved`, `upgraded` only after a version change, a 401 reported once without a request to Supertext, nothing sent with reports off, storage errors swallowed, ping answers, `SUPERTEXT_VERSION_REPORTS`), `SupertextClientsTest` (Translation review, see *Supertext API protocol*), `SupertextTest` (codes sent as given, one message per SDK error code).
 `.github/workflows/checks.yml` and `links.yml` lint the workflows and check the links. `.github/workflows/e2e.yml` runs the end-to-end test against the real Supertext API and regenerates the docs screenshots (see *End-to-end tests*).
 
 Unit tests worth knowing: `LanguageCodesTest` (exact matches, no default regions, the setting wins, sources, `unsupported_language`), `ReportingTest` (the report and the stored state never contain the key, the SDK version reported, a state stored by the SDK 0.2 reporter kept without a new report, `installed` → `settings_saved`, `upgraded` only after a version change, a 401 reported once without a request to Supertext, nothing sent with reports off, storage errors swallowed, ping answers, `SUPERTEXT_VERSION_REPORTS`), `SupertextTest` (codes sent as given, one message per SDK error code).
@@ -218,7 +234,7 @@ MAGENTO_URL=http://127.0.0.1:8081 DATABASE_URL=mysql://root:root@127.0.0.1:3306/
 
 ## Demo (Railway)
 
-`demo/` is a Mage-OS 3.5 shop with English sample content and store views for German (Switzerland), French (Switzerland) and Italian (Switzerland), plus this module. The Railway service *Magento* (project *supertext-cms-demos-php*) builds `demo/Dockerfile` with the repository root as context, from `main`. Railway no longer reads `railway.json`, so the Dockerfile path, healthcheck (`/health`, a static file) and restart policy are set on the service itself; `railway.json` documents the same values.
+`demo/` is a Mage-OS 3.6 shop with English sample content and store views for German (Switzerland), French (Switzerland) and Italian (Switzerland), plus this module. The Railway service *Magento* (project *supertext-cms-demos-php*) builds `demo/Dockerfile` with the repository root as context, from `main`. Railway no longer reads `railway.json`, so the Dockerfile path, healthcheck (`/health`, a static file) and restart policy are set on the service itself; `railway.json` documents the same values.
 
 The image downloads Mage-OS with Composer at build time (no keys needed), copies the module to `app/code`, enables all modules except `Magento_TwoFactorAuth` (demo convenience: Supertext staff log in with the `DEMO_*` accounts only) and runs Apache with `pub/` as document root. The container keeps **no files** between deploys:
 
@@ -238,7 +254,8 @@ Variables (Railway service variables; template in `demo/.env.example`):
 | `MAGENTO_DOMAIN` | Public host name; default `RAILWAY_PUBLIC_DOMAIN` |
 | `ELASTICSEARCH_HOST`, `ELASTICSEARCH_PORT`, `ELASTICSEARCH_INDEX_PREFIX` | Search engine; default `elasticsearch.railway.internal`, `9200`, `supertext_magento_demo` |
 | `SUPERTEXT_API_KEY` | Supertext API key. No Supertext account yet? Create one at https://www.supertext.com/person/en/account/signin. Generate your API key at https://www.supertext.com/en/integrations/api (requires the Admin role). |
-| `SUPERTEXT_API_ENDPOINT` | Optional: another API, e.g. the stand-in |
+| `SUPERTEXT_API_ENDPOINT` | Optional: another API, e.g. the stand-in (to try the review service, set a store view's *Translation review* to *Yes* instead) |
+| `SUPERTEXT_REVIEW_URL` | Optional: another review service than Supertext's (wins over *Review service URL*; empty keeps the setting) |
 | `SUPERTEXT_VERSION_REPORTS` | Optional: `0` turns *Send version information to Supertext* off (wins over the setting) |
 | `SUPERTEXT_REPORT_URL` | Tests only: where version reports go (the stand-in's `http://127.0.0.1:8765/report`) |
 | `DEMO_ADMIN_EMAIL`, `DEMO_ADMIN_PASSWORD` | Admin in the *Administrators* role. `MAGENTO_ADMIN_EMAIL` / `MAGENTO_ADMIN_PASSWORD` are read as fallbacks. |
@@ -276,6 +293,28 @@ BASE_URL=http://localhost:8091/admin DEMO_ADMIN_EMAIL=… DEMO_ADMIN_PASSWORD=�
 
 `ONLY=admin` or `ONLY=editor` runs one part. Run it in the same commit as any UI change the images show. The E2E workflow runs it on every push to `main` too and opens a pull request when the images changed (see *End-to-end tests*). So that the images only change when the UI does, the script shows a fixed time in the key check's *Checked:* line, leaves the date columns (*Created*, *Modified*, *Last Updated At*) out of the grids, and replaces the demo's local address (the ping address) with `https://shop.example.com`. The stand-in logs segments it has no translation for as `{"unknown": …}`; the workflow warns about them.
 
+## Demo movie
+
+`docs/images/demo.gif` (shown at the top of the README) is recorded by `tests/docs/movie.mjs` with Supertext's movie kit (`tests/docs/movie/`: Playwright screencast → ffmpeg; intro and outro cards, captions, cursor; Inter font under the SIL Open Font License in `movie/assets/fonts/`). Like the screenshots, it needs a demo whose module talks to the stand-in API, `ffmpeg` and, for the voice, Piper:
+
+```bash
+pip install piper-tts                       # the voice; without it (or with MOVIE_VOICE=0) the movie is silent
+cd tests/docs && npm install
+node stand-in.mjs &                         # http://127.0.0.1:8765/v1/
+# a fresh demo as for the screenshots (SUPERTEXT_API_ENDPOINT=http://127.0.0.1:8765/v1/,
+# SUPERTEXT_REPORT_URL=http://127.0.0.1:8765/report, no SUPERTEXT_API_KEY), on port 8091:
+BASE_URL=http://localhost:8091/admin DEMO_ADMIN_EMAIL=… DEMO_ADMIN_PASSWORD=… npm run movie:install   # enters the key
+BASE_URL=http://localhost:8091/admin DEMO_EDITOR_EMAIL=… DEMO_EDITOR_PASSWORD=… npm run movie
+```
+
+**Demo movie** (`npm run movie`, about 48 seconds, 1280×720, an English voice and English captions): the demo editor opens the English product *Dark chocolate praline box*, clicks **Translate with Supertext** on its edit page, keeps *Deutsch (Schweiz)* and *Français (Suisse)* (unticks Italian), clicks **Translate** (the waiting time is cut), opens the product again and switches the scope to *Deutsch (Schweiz)*. It needs an API key in the configuration (the install movie or the screenshots enter one; the stand-in accepts any). The script writes the GIF (800 px, 12 fps, keep it under 3 MB) to `docs/images/demo.gif` and the MP4 to `tests/docs/movie/out/Magento-Supertext-Translation.mp4` (git-ignored; `MOVIE_OUT` changes the path). The MP4 is not committed; the GIF is silent. Re-record it in the same commit when the translate page changes.
+
+**Install and configuration movie** (`npm run movie:install`, about 93 seconds, MP4 only): the same kit, voice and look, for administrators, signed in as the demo **administrator** on a demo without an API key. A terminal (`kit.terminal()`) with the commands from `docs/INSTALLATION.md` (`composer config repositories…`, `composer require`, `module:enable`, `setup:upgrade`, `cache:flush`; output shortened), then *Stores → Configuration → Supertext → Translation*: where the key comes from (supertext.com → Integrations → API; create an account at supertext.com), the made-up key `st-demo-0000-0000-0000` in **Supertext API key**, **Save Config** and *API key checked: the connection to Supertext works.*, the *Store views* overview under **Language**, the scope *Deutsch (Schweiz)* with **Supertext language** *German (Switzerland) (de-CH)* and **Translation review** left at *No*, **Save Config**, and where editors find **Translate with Supertext** (*Catalog → Products* → *Actions*). The script keeps the *Supertext connection* group's lower part (with the ping address, a local URL in the demo) out of view. The MP4 goes to `tests/docs/movie/out/Magento-Supertext-Translation-install.mp4` (git-ignored, not committed; `MOVIE_OUT` changes the path). Re-record it when the installation steps or the *Supertext* configuration change.
+
+Page loads are cut from both movies (Magento's admin is slow on a local PHP server). The voice model (63 MB, pinned revision, checked by SHA-256) is downloaded once into `tests/docs/movie/voice-cache/` (git-ignored, never committed); the time spent generating speech is cut too. `CHROMIUM_PATH` points the scripts at another Chromium than Playwright's.
+
+Voice: Piper voice “alba” (en_GB), trained on a dataset from the University of Edinburgh's Centre for Speech Technology Research, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+
 ## Code quality and security checks
 
 Before starting work in this repo, look at its open findings: code scanning alerts, secret scanning alerts, Dependabot PRs and the "Broken links in the docs" issue.
@@ -285,7 +324,7 @@ Before starting work in this repo, look at its open findings: code scanning aler
 - **PHPStan** (job **phpstan** in `ci.yml`, configuration `phpstan.neon`): level 5 on `Api/`, `Block/`, `Console/`, `Controller/`, `Model/`, `Observer/` and `registration.php` (not the templates, `demo/` or the tests). PHPStan has to know Magento's classes, so it runs from a Mage-OS root (no database needed) with [bitexpert/phpstan-magento](https://github.com/bitExpert/phpstan-magento), which also understands the generated factories and proxies. Locally:
 
   ```bash
-  composer create-project --no-dev --repository-url=https://repo.mage-os.org/ mage-os/project-community-edition:3.5.0 /tmp/mageos
+  composer create-project --no-dev --repository-url=https://repo.mage-os.org/ mage-os/project-community-edition:3.6.0 /tmp/mageos
   cd /tmp/mageos
   composer config allow-plugins.phpstan/extension-installer true
   composer require --dev --with-all-dependencies phpstan/phpstan:^2.1 phpstan/extension-installer bitexpert/phpstan-magento
@@ -294,6 +333,7 @@ Before starting work in this repo, look at its open findings: code scanning aler
 
   Known findings that aren't fixed yet go in `phpstan-baseline.neon` (add `--generate-baseline /path/to/magento-supertext-translation/phpstan-baseline.neon`); it holds 20 findings in 9 groups that come from Magento's own typing (repository `save()` taking the model, `getResource()->saveAttribute()`, deprecated `getResource()`, `Zend_Db_Select` from `having()`, `Phrase` titles). Fix new findings instead of adding them.
 - **GitHub settings** (set by Remy's setup script, not in the repo): secret scanning with push protection (a push containing a known token format is rejected; findings under *Security → Secret scanning*) and CodeQL default setup (findings under *Security → Code scanning* and as pull request comments). CodeQL doesn't cover PHP, which is why this repo runs PHPStan.
+- `.github/workflows/support-triage.yml`: support requests from the Supertext integrations website arrive as issues labelled `support` (contact details stay in the Supertext CMS). Claude classifies each one: answers questions (marked `<!-- supertext:reply -->`, emailed to the sender by the CMS) and closes them, fixes bugs as pull requests for review (never merged automatically), labels feature requests `feature-request`. Only people with triage rights can add labels, so outsiders can't start it. Needs the organisation secret `ANTHROPIC_API_KEY`; the workflow is the same in every Supertext repo.
 
 ## Releasing
 
@@ -316,12 +356,14 @@ The release attaches `magento-supertext-translation-X.Y.Z.zip`, built by `./buil
 
 ## Known limitations / roadmap
 
+- Translation files: no console commands for export and import yet; directives (`{{…}}`) in rich text reach translators as protected inline tags in XLIFF and as `translate="no"` spans in HTML, but a translator who edits them changes them.
 - The source is always the default values (*All Store Views*); translating from one store view into another isn't offered.
 - Not translated yet: other product attributes (custom text attributes, dropdown option labels), image labels, custom options, widget instances, emails.
 - Subcategory URL paths in a store view follow a translated parent only once the subcategory is translated too.
 - Mage-OS's own automatic translation module, when switched on with periodic re-translation, can overwrite store-view values.
 - Translation runs in the browser, one item and store view at a time; selections are cut to 100 items. A queue (Magento's message queue) would allow more.
 - Professional (human) translation orders, as in the WordPress plugin, are not offered.
+- Re-translating with *Overwrite* replaces manual changes; no change detection. A translation memory and reviewers' corrections come from the review service when a store view has *Translation review* on; corrections reach Magento only with the next translation (no push).
 - The *Supertext language* list is the SDK's copy of Supertext's `features` list (October 2026) with English language names; a language Supertext adds later appears with the next SDK update (a code saved before is kept and sent as it is).
 - Under mod_php (no `fastcgi_finish_request()`), the automatic key check and a due version report run at the end of the request instead of after the response; they only make a request when the key changed or a report is due (at most 10 s for the check, 3 s for the report).
-- The docs screenshots of the configuration (`module-settings.png`, `module-language-store.png`) still show version 0.1 (free-text language code, *Connected* message); regenerate them with `tests/docs/screenshots.mjs` against a fresh demo.
+- The docs screenshots of the configuration (`module-settings.png`, `module-language-store.png`) still show version 0.1 (free-text language code, *Connected* message, no *Translation review*, no *Review service URL*); regenerate them with `tests/docs/screenshots.mjs` against a fresh demo.

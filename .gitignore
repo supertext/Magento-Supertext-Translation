@@ -5,3 +5,5 @@
 /tests/e2e/node_modules/
 /tests/e2e/artifacts/
 .DS_Store
+/tests/docs/movie/out/
+/tests/docs/movie/voice-cache/

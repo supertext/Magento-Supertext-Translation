@@ -6,9 +6,11 @@
                 <environment>live</environment>
                 <timeout>180</timeout>
                 <version_reports>1</version_reports>
+                <review_url>https://localizationreview-production.up.railway.app/v1/</review_url>
             </api>
             <language>
                 <tone>default</tone>
+                <review>0</review>
             </language>
             <cms>
                 <status>same</status>

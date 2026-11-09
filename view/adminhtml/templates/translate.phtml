@@ -18,6 +18,7 @@ $labels = [
 ?>
 <div class="supertext-page" data-role="supertext-translate"
      data-run-url="<?= $escaper->escapeUrl($block->getRunUrl()) ?>"
+     data-import-url="<?= $escaper->escapeUrl($block->getImportUrl()) ?>"
      data-type="<?= $escaper->escapeHtmlAttr($block->getType()) ?>">
 
     <?php if (!$block->hasApiKey()): ?>
@@ -139,6 +140,73 @@ $labels = [
             </div>
         <?php endif ?>
     </section>
+
+    <?php if ($items !== [] && count($stores) > 1 && $block->canEdit()): ?>
+        <section class="admin__page-section supertext-files">
+            <div class="admin__page-section-title"><span class="title"><?= $escaper->escapeHtml(__('Export for translation')) ?></span></div>
+            <form method="post" action="<?= $escaper->escapeUrl($block->getExportUrl()) ?>" class="supertext-export-form">
+                <input type="hidden" name="form_key" value="<?= $escaper->escapeHtmlAttr($block->getFormKey()) ?>">
+                <input type="hidden" name="type" value="<?= $escaper->escapeHtmlAttr($block->getType()) ?>">
+                <input type="hidden" name="ids" value="<?= $escaper->escapeHtmlAttr($block->getIdsParam()) ?>">
+                <div class="admin__fieldset">
+                    <div class="admin__field">
+                        <label class="admin__field-label" for="supertext-format"><span><?= $escaper->escapeHtml(__('File format')) ?></span></label>
+                        <div class="admin__field-control">
+                            <select class="admin__control-select" id="supertext-format" name="format">
+                                <option value="xliff"><?= $escaper->escapeHtml(__('XLIFF 1.2 (for translation tools)')) ?></option>
+                                <option value="html"><?= $escaper->escapeHtml(__('HTML (one language per file)')) ?></option>
+                            </select>
+                            <div class="admin__field-note">
+                                <?= $escaper->escapeHtml(__('The file contains the texts a translation with Supertext would send, for the store views ticked above; "Overwrite existing translations" above includes fields that are already translated.')) ?>
+                                <?= $escaper->escapeHtml(__('XLIFF is the better choice for translation tools. In an HTML file (one item, one store view), translators must keep the head and the data-st-id attributes.')) ?>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="admin__field">
+                        <div class="admin__field-label"></div>
+                        <div class="admin__field-control">
+                            <button type="submit" class="action-secondary supertext-download"><span><?= $escaper->escapeHtml(__('Download file')) ?></span></button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </section>
+    <?php endif ?>
+
+    <section class="admin__page-section supertext-files">
+        <div class="admin__page-section-title"><span class="title"><?= $escaper->escapeHtml(__('Import translation')) ?></span></div>
+        <form class="supertext-import-form" enctype="multipart/form-data">
+            <div class="admin__fieldset">
+                <div class="admin__field">
+                    <label class="admin__field-label" for="supertext-file"><span><?= $escaper->escapeHtml(__('Translated file (XLIFF or HTML)')) ?></span></label>
+                    <div class="admin__field-control">
+                        <input type="file" id="supertext-file" name="file" accept=".xlf,.xliff,.html,.htm,application/x-xliff+xml,text/html">
+                        <div class="admin__field-note"><?= $escaper->escapeHtml(__('A file exported with "Export for translation" and translated since. It says itself which items and store views it belongs to; the texts are saved like a translation with Supertext.')) ?></div>
+                    </div>
+                </div>
+                <div class="admin__field">
+                    <div class="admin__field-label"></div>
+                    <div class="admin__field-control">
+                        <div class="admin__field-option">
+                            <input type="checkbox" class="admin__control-checkbox" id="supertext-include-changed" name="include_changed" value="1">
+                            <label class="admin__field-label" for="supertext-include-changed"><?= $escaper->escapeHtml(__('Also import texts whose source changed since the export')) ?></label>
+                        </div>
+                        <div class="admin__field-option">
+                            <input type="checkbox" class="admin__control-checkbox" id="supertext-import-overwrite" name="overwrite" value="1">
+                            <label class="admin__field-label" for="supertext-import-overwrite"><?= $escaper->escapeHtml(__('Overwrite existing translations')) ?></label>
+                        </div>
+                    </div>
+                </div>
+                <div class="admin__field">
+                    <div class="admin__field-label"></div>
+                    <div class="admin__field-control">
+                        <button type="submit" class="action-secondary supertext-import"><span><?= $escaper->escapeHtml(__('Import translation')) ?></span></button>
+                    </div>
+                </div>
+            </div>
+        </form>
+        <div class="supertext-import-result" role="status"></div>
+    </section>
 </div>
 
 <?= /* @noEscape */ $secureRenderer->renderTag('style', [], <<<CSS
@@ -160,6 +228,9 @@ $labels = [
 .supertext-page .supertext-muted { color: #6c868e; }
 .supertext-page .supertext-badge { background: #e3e3e3; padding: 0 0.6rem; font-size: 1.1rem; }
 .supertext-page .supertext-unmapped { color: #c0392b; font-weight: 600; }
+.supertext-page .supertext-files { margin-top: 3rem; }
+.supertext-page .supertext-import-result .message { margin-top: 1rem; }
+.supertext-page .supertext-import-result ul { margin: 0.4rem 0 0 2rem; }
 CSS, false) ?>
 
 <?php
@@ -171,13 +242,79 @@ $texts = [
     'done'    => (string) __('Done: %1 translated, %2 unchanged, %3 failed.'),
     'hint'    => (string) __('To replace existing translations, tick "Overwrite existing translations" and translate again.'),
     'open'    => (string) __('Open'),
+    'importing' => (string) __('Importing…'),
+    'noFile'  => (string) __('Choose a file to import.'),
+    'tooLarge' => (string) __('The file is too large (at most 10 MB).'),
 ];
 $script = 'window.supertextTexts = ' . json_encode($texts, JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) . ';' . <<<'JS'
 require(['jquery'], function ($) {
     var root = document.querySelector('[data-role="supertext-translate"]');
+    var t = window.supertextTexts;
+    var exportForm = root && root.querySelector('.supertext-export-form');
+    if (exportForm) {
+        // The store views and "overwrite" ticked above go into the export.
+        exportForm.addEventListener('submit', function (event) {
+            exportForm.querySelectorAll('input[data-copied]').forEach(function (input) { input.remove(); });
+            var stores = root.querySelectorAll('.supertext-target:checked');
+            if (!stores.length) { event.preventDefault(); alert(t.noStore); return; }
+            stores.forEach(function (c) { add('stores[]', c.value); });
+            if (root.querySelector('#supertext-overwrite').checked) { add('overwrite', '1'); }
+            function add(name, value) {
+                var input = document.createElement('input');
+                input.type = 'hidden'; input.name = name; input.value = value; input.setAttribute('data-copied', '1');
+                exportForm.appendChild(input);
+            }
+        });
+    }
+    var importForm = root && root.querySelector('.supertext-import-form');
+    if (importForm) {
+        importForm.addEventListener('submit', async function (event) {
+            event.preventDefault();
+            var file = importForm.querySelector('#supertext-file').files[0];
+            var out = root.querySelector('.supertext-import-result');
+            out.textContent = '';
+            if (!file) { alert(t.noFile); return; }
+            if (file.size > 10000000) { show('message-error', t.tooLarge); return; }
+            var button = importForm.querySelector('.supertext-import');
+            var data = new FormData(importForm);
+            data.append('form_key', window.FORM_KEY);
+            button.disabled = true;
+            show('', t.importing);
+            try {
+                var response = await fetch(root.getAttribute('data-import-url'), { method: 'POST', body: data, credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                var result = await response.json();
+                out.textContent = '';
+                if (!result.ok) {
+                    show('message-error', result.message || t.failed);
+                } else {
+                    result.jobs.forEach(function (job) {
+                        var box = show(job.ok ? 'message-success' : 'message-error', job.title);
+                        if (job.editUrl) {
+                            var link = document.createElement('a'); link.href = job.editUrl; link.textContent = ' ' + t.open;
+                            box.firstElementChild.appendChild(link);
+                        }
+                        var list = document.createElement('ul');
+                        (job.error ? [job.error] : job.lines.concat(job.notes)).forEach(function (line) {
+                            var li = document.createElement('li'); li.textContent = line; list.appendChild(li);
+                        });
+                        box.firstElementChild.appendChild(list);
+                    });
+                }
+            } catch (e) {
+                out.textContent = '';
+                show('message-error', t.failed);
+            }
+            button.disabled = false;
+            function show(kind, text) {
+                var box = document.createElement('div'); box.className = 'message ' + kind;
+                var inner = document.createElement('div'); inner.textContent = text; box.appendChild(inner);
+                out.appendChild(box);
+                return box;
+            }
+        });
+    }
     var go = root && root.querySelector('.supertext-go');
     if (!go) { return; }
-    var t = window.supertextTexts;
     go.addEventListener('click', async function () {
         var stores = Array.prototype.map.call(root.querySelectorAll('.supertext-target:checked'), function (c) { return c.value; });
         if (!stores.length) { alert(t.noStore); return; }

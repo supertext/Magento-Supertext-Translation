@@ -10,9 +10,9 @@ declare(strict_types=1);
 
 namespace Supertext\Translation\Model\Translation;
 
-use Supertext\Sdk\V1\Client;
 use Supertext\Sdk\V1\SupertextException as SdkException;
 use Supertext\Translation\Api\Supertext;
+use Supertext\Translation\Api\SupertextClients;
 use Supertext\Translation\Api\SupertextException;
 use Supertext\Translation\Model\Config;
 use Supertext\Translation\Model\Reporting;
@@ -20,7 +20,7 @@ use Supertext\Translation\Model\Reporting;
 /** One entry point for the translate page, its endpoint and the console command. */
 class Translator
 {
-    private ?Client $client = null;
+    private ?SupertextClients $clients = null;
 
     public function __construct(
         private readonly Config $config,
@@ -69,10 +69,12 @@ class Translator
         $target = $this->config->targetCode($storeId);
         $source = $this->config->sourceCode();
 
-        $this->client ??= $this->config->client();
+        // Store views with *Translation review* on go through the review service (same key, same protocol).
+        $this->clients ??= $this->config->clients();
+        $client = $this->clients->forReview($this->config->review($storeId));
 
         try {
-            return $this->handler($type)->translate($this->client, $type, $id, $storeId, $overwrite);
+            return $this->handler($type)->translate($client, $type, $id, $storeId, $overwrite);
         } catch (SdkException $e) {
             if ($e->errorCode === SdkException::AUTHENTICATION_FAILURE) {
                 $this->reporting->authenticationFailed((int) ($e->status ?? 401));
@@ -80,6 +82,47 @@ class Translator
 
             throw Supertext::error($e, $source, $target);
         }
+    }
+
+    /**
+     * For a translation file: the texts translate() would send (field => text, rich text with its
+     * directives protected) and the fields that keep their translation; null if the item doesn't exist.
+     *
+     * @return array{segments: array<string, array{text: string, html: bool}>, kept: list<string>}|null
+     */
+    public function fileSegments(string $type, int $id, int $storeId, bool $overwrite): ?array
+    {
+        if (!$this->exists($type, $id)) {
+            return null;
+        }
+
+        $planner  = $this->handler($type)->planner($type, $id, $storeId, $overwrite);
+        $segments = [];
+
+        foreach ($planner->segments() as $field => $segment) {
+            $segments[$field] = ['text' => $segment->text, 'html' => $segment->html];
+        }
+
+        return ['segments' => $segments, 'kept' => $planner->kept()];
+    }
+
+    /**
+     * Writes the texts of a translation file (field => text, as fileSegments() gave them) exactly like
+     * a translation with Supertext, without calling Supertext.
+     *
+     * @param array<string, string> $texts
+     *
+     * @return array{status: string, title: string, translated: list<string>, kept: list<string>, notes: list<string>, targetId?: int}
+     *
+     * @throws SupertextException|\Magento\Framework\Exception\LocalizedException
+     */
+    public function importTexts(string $type, int $id, int $storeId, bool $overwrite, array $texts): array
+    {
+        if ($storeId <= 0) {
+            throw new SupertextException('Choose a store view to translate into.');
+        }
+
+        return $this->handler($type)->translate(static fn (array $segments): array => array_intersect_key($texts, $segments), $type, $id, $storeId, $overwrite);
     }
 
     private function handler(string $type): EavTranslator|CmsTranslator

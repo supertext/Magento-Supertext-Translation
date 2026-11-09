@@ -93,9 +93,11 @@ class EavTranslator
     /**
      * @return array{status: string, title: string, translated: list<string>, kept: list<string>, notes: list<string>, targetId?: int}
      *
+     * @param Client|\Closure(array<string, \Supertext\Sdk\V1\Segment>): array<string, string> $client the texts of a translation file instead of Supertext
+     *
      * @throws SupertextException|\Supertext\Sdk\V1\SupertextException on failure (Translator turns SDK errors into messages)
      */
-    public function translate(Client $client, string $type, int $id, int $storeId, bool $overwrite): array
+    public function translate(Client|\Closure $client, string $type, int $id, int $storeId, bool $overwrite): array
     {
         $definition = EntityTypes::get($type);
         $fields     = $definition['fields'];
@@ -110,7 +112,8 @@ class EavTranslator
             return ['status' => 'unchanged', 'title' => $title, 'translated' => [], 'kept' => $planner->kept(), 'notes' => []];
         }
 
-        $values = $planner->apply($client->translateTexts(
+        // A translation file brings its own texts (Translator::importTexts()); otherwise Supertext translates.
+        $values = $planner->apply($client instanceof \Closure ? $client($planner->segments()) : $client->translateTexts(
             $planner->segments(),
             $this->config->targetCode($storeId),
             $this->config->sourceCode(),
@@ -137,6 +140,14 @@ class EavTranslator
         $this->refresh($type, $id);
 
         return ['status' => 'translated', 'title' => $title, 'translated' => array_keys($values), 'kept' => $planner->kept(), 'notes' => $notes];
+    }
+
+    /** What translate() would send and keep, for a translation file. */
+    public function planner(string $type, int $id, int $storeId, bool $overwrite): FieldPlanner
+    {
+        $fields = EntityTypes::get($type)['fields'];
+
+        return new FieldPlanner($fields, $this->values($type, $id, 0, array_keys($fields)), $this->values($type, $id, $storeId, array_keys($fields)), $overwrite);
     }
 
     /** Sets the store view's URL key from the translated name and regenerates its URL rewrites. Returns a note if it was kept. */

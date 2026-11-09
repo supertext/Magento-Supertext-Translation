@@ -10,8 +10,8 @@ use Supertext\Translation\Api\SupertextException;
 
 /**
  * Magento locales → Supertext codes, as Config::targetCode() and sourceCode() use them: the store
- * view's Supertext language, else an exact match of the locale, else unsupported_language. No
- * default regions, no guessing.
+ * view's Supertext language, else an exact match of the locale, else the SDK's default, else
+ * unsupported_language. Nothing else is guessed.
  */
 final class LanguageCodesTest extends TestCase
 {
@@ -24,19 +24,53 @@ final class LanguageCodesTest extends TestCase
         self::assertSame('zh-Hans', LanguageCodes::target('zh_hans'));
     }
 
-    public function testNoDefaultRegionsAndNoGuessing(): void
+    public function testLocalesWithoutAnExactMatchUseTheSdkDefault(): void
     {
-        foreach (['de', 'es_ES', 'nl_NL', 'zh_Hans_CN', 'sl_SI', 'xx_YY'] as $locale) {
+        self::assertSame('es', LanguageCodes::target('es_ES'));
+        self::assertSame('nl', LanguageCodes::target('nl_NL'));
+        self::assertSame('sl', LanguageCodes::target('sl_SI'));
+        self::assertSame('nb', LanguageCodes::target('nb_NO'));
+        self::assertSame('zh-Hans', LanguageCodes::target('zh_Hans_CN'));
+        self::assertSame('zh-Hant', LanguageCodes::target('zh_Hant_TW'));
+        self::assertSame('de-DE', LanguageCodes::target('de'));
+        self::assertSame('es', LanguageCodes::suggest('es_ES'));
+        self::assertSame('de-CH', LanguageCodes::suggest('de_CH'));
+        self::assertTrue(LanguageCodes::isExactMatch('de_DE'));
+        self::assertFalse(LanguageCodes::isExactMatch('es_ES'));
+    }
+
+    public function testNoGuessingWithoutADefault(): void
+    {
+        foreach (['en_IE', 'de_LI', 'fr_BE', 'gsw', 'xx_YY'] as $locale) {
             self::assertNull(LanguageCodes::targetOrNull($locale), $locale);
+            self::assertNull(LanguageCodes::suggest($locale), $locale);
         }
 
         try {
-            LanguageCodes::target('es_ES');
+            LanguageCodes::target('en_IE');
             self::fail('expected unsupported_language');
         } catch (SupertextException $e) {
             self::assertStringStartsWith('The language "%1" has no Supertext language yet.', $e->template());
-            self::assertSame(['es_ES'], $e->parameters());
-            self::assertStringContainsString('Stores → Configuration → Supertext → Translation → Language', $e->getMessage());
+            self::assertSame(['en_IE'], $e->parameters());
+            self::assertStringContainsString('Supertext language list under Stores → Configuration → Supertext → Translation → Language', $e->getMessage());
+        }
+    }
+
+    public function testTheListHasEveryTargetAsNameAndCode(): void
+    {
+        $options = LanguageCodes::options('en_US');
+        $labels  = array_column($options, 'label', 'value');
+
+        self::assertCount(\count(\Supertext\Sdk\V1\Languages::TARGETS), $options);
+        self::assertSame('German (Switzerland) (de-CH)', $labels['de-CH']);
+        self::assertSame('Swiss German (Zurich) (gsw-u-sd-chzh)', $labels['gsw-u-sd-chzh']);
+        self::assertSame('Albanian (sq)', $options[0]['label'], 'sorted by name');
+        self::assertSame('de-CH', LanguageCodes::canonical('de_ch'));
+        self::assertNull(LanguageCodes::canonical('de'));
+
+        if (class_exists(\Locale::class)) {
+            self::assertSame('Deutsch (Schweiz)', LanguageCodes::displayName('de-CH', 'de_CH'));
+            self::assertContains('Spanisch (es)', array_column(LanguageCodes::options('de_DE'), 'label'));
         }
     }
 

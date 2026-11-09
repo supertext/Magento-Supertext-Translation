@@ -106,6 +106,22 @@ class Translate extends Template
         return $this->getUrl('supertext/translate/run');
     }
 
+    public function getExportUrl(): string
+    {
+        return $this->getUrl('supertext/translate/export');
+    }
+
+    public function getImportUrl(): string
+    {
+        return $this->getUrl('supertext/translate/import');
+    }
+
+    /** The ids of the listed items, comma-separated (for the export form). */
+    public function getIdsParam(): string
+    {
+        return implode(',', array_column($this->getItems(), 'id'));
+    }
+
     public function getConfigUrl(): string
     {
         return $this->getUrl('adminhtml/system_config/edit', ['section' => 'supertext']);

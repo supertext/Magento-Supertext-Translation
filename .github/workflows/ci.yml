@@ -41,8 +41,12 @@ jobs:
   # classes; bitexpert/phpstan-magento handles the generated factories and proxies.
   phpstan:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mageos: ['3.6.0', '4.0.0']
     env:
-      MAGEOS_VERSION: 3.5.0
+      MAGEOS_VERSION: ${{ matrix.mageos }}
       COMPOSER_MEMORY_LIMIT: -1
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -72,14 +76,18 @@ jobs:
         working-directory: site
         run: vendor/bin/phpstan analyse -c ../module/phpstan.neon --no-progress --error-format=github --memory-limit=2G
 
-  # Installs Mage-OS (Magento Open Source 2.4.9 compatible) with MySQL 8.4 and Elasticsearch 8,
+  # Installs Mage-OS (3.6 and 4.0) with MySQL 8.4 and Elasticsearch 8,
   # adds the module like a hand install (app/code), runs the demo setup twice, then
   # translates the sample content with the console command against the stand-in API.
   magento:
     needs: unit
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mageos: ['3.6.0', '4.0.0']
     env:
-      MAGEOS_VERSION: 3.5.0
+      MAGEOS_VERSION: ${{ matrix.mageos }}
       DEMO_ADMIN_EMAIL: admin@example.com
       DEMO_ADMIN_PASSWORD: Ci-Admin-Chocolate-2026
       DEMO_EDITOR_EMAIL: editor@example.com

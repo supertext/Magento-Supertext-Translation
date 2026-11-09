@@ -60,6 +60,38 @@ To replace existing translations, tick **Overwrite existing translations**. The 
 
 <img src="images/overwrite-warning.png" alt="Translate with Supertext for the category Swiss chocolate, already translated into Deutsch (Schweiz): Overwrite existing translations is ticked and a warning explains that fields that are already translated will be replaced and changes made by hand are lost" width="720">
 
+## Export for translation and import the translated file
+
+Instead of translating with Supertext AI right away, you can export the texts as a file, have them translated elsewhere, and import the translated file. Both are at the bottom of the *Translate with Supertext* page (open it from the list's **Actions** or an edit page's button, as for translating).
+
+**Export for translation**
+
+1. Tick the store views to translate into (above, as for translating) and, if needed, **Overwrite existing translations** (without it, fields that already have a translation in a store view are left out, as when translating).
+2. Under **Export for translation**, choose the **File format**:
+   - **XLIFF 1.2 (for translation tools)**: the better choice for translators and translation tools (Trados, memoQ, Phrase, …): formatting appears as protected tags, and one file holds all selected items and store views.
+   - **HTML (one language per file)**: one item in one store view; it can be uploaded to Supertext's web app or translated by anyone who works with HTML. Translators must leave the file's head (the `supertext:` lines) and the `data-st-id` attributes alone. An HTML file can't mark a text as untranslated: imported unchanged, it writes the source text into the store view.
+3. Click **Download file**. The file is named like `magento-product-42-store-2.xlf`. *Nothing to translate.* means every field is empty or already translated in the chosen store views. Leave `{{…}}` directives in the texts as they are.
+4. Send the file to your translator, open it in your translation tool, or upload it at supertext.com.
+
+**Import translation**
+
+1. Open the *Translate with Supertext* page (any item; the file itself says which items and store views it belongs to) and, under **Import translation**, choose the file under **Translated file (XLIFF or HTML)**. Options (both off by default):
+   - **Also import texts whose source changed since the export**: a text that was edited in the default values after the export is skipped unless you tick this.
+   - **Overwrite existing translations**: a field that got a translation in the store view since the export is kept unless you tick this.
+2. Click **Import translation**. The texts are saved exactly as when translating with Supertext: store-view values for products and categories (URL key included), a copy per store view for pages and blocks.
+3. The page shows a summary per item and store view, with an **Open** link:
+
+| Line | Meaning |
+| --- | --- |
+| Imported: 3 | Saved in the store view. |
+| Skipped, source changed since the export: 1 | The default value was edited after the export. Export again, or import with *Also import texts whose source changed since the export*. |
+| Not translated in the file: 1 | The file has no translation for this text. |
+| Formatting changed, not imported: 1 | The translation breaks or adds formatting (tags) the source doesn't have. Fix it in the file and import again. |
+| Not in the file: 1 | The field isn't in the file, e.g. one filled after the export. |
+| Kept, already translated in this store view: 1 | The field got a translation since the export; tick *Overwrite existing translations* to replace it. |
+
+Errors: *This file isn't a valid XLIFF or HTML translation file.*, *This file wasn't exported by the Supertext module, or its header was removed.*, *The file is too large (at most 10 MB).*, *This file belongs to another system (…)* (exported by another Supertext plugin), *The item this file was exported from no longer exists.*, *The shop has no store view …*, *You are not allowed to edit this item.* Nothing is saved for an item with an error.
+
 ## What is translated
 
 | Item | Fields |
@@ -76,6 +108,8 @@ To replace existing translations, tick **Overwrite existing translations**. The 
 ## Review
 
 Products and categories: open the item, switch the scope to the store view and read the fields; the translation is live as soon as it is saved. Pages and blocks: open the copy (**Open** in the result, or the list). To check in the shop, switch the store view in the shop's language switcher.
+
+**Translation review:** if your administrator turned on *Translation review* for a store view, reviewers (your colleagues or Supertext linguists) check and correct the translations on the storefront. Their corrections come into Magento the next time you translate the items into that store view: after a review, translate them again with **Overwrite existing translations**. Texts reviewed once keep their corrected wording in later translations.
 
 ## When something goes wrong
 
@@ -96,3 +130,7 @@ The table shows the reason for each item and store view that fails; the other on
 | *Supertext does not translate from "…" into "…"* | Supertext doesn't offer that store view's Supertext language; ask your administrator to choose another one. |
 | *Supertext offers no formal or informal tone for this language* | The tone set for this store view isn't available at Supertext. Ask your administrator to set it to *Supertext default*. |
 | *The Supertext translation came back incomplete* | Nothing was saved for that item and store view. Click **Translate** again. |
+
+## Support
+
+Questions, problems or ideas: use the [Supertext support form](https://integrations.supertext.com/en/support?platform=magento). Mention the version of Magento and of the plugin, what you did and what you expected; an error message helps a lot. You get an answer by email, in your language.

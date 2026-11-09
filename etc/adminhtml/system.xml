@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!--
   Stores → Configuration → Supertext → Translation.
-  The API settings are global; the Supertext language and the tone can be set per store view.
+  The API settings are global; the Supertext language, Translation review and the tone can be set per store view.
   Keep the settings table in docs/INSTALLATION.md in sync.
 -->
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
@@ -43,6 +43,11 @@
                     <comment>Optional. Overrides the environment, e.g. for a test server. The SUPERTEXT_API_ENDPOINT environment variable wins.</comment>
                     <validate>validate-url</validate>
                 </field>
+                <field id="review_url" translate="label comment" type="text" sortOrder="35" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Review service URL</label>
+                    <comment>Address of Supertext's review service, used for store views with Translation review on. Empty turns review off for every store view. Only change it when Supertext gives you another address. The SUPERTEXT_REVIEW_URL environment variable wins.</comment>
+                    <validate>validate-url</validate>
+                </field>
                 <field id="timeout" translate="label comment" type="text" sortOrder="40" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Timeout (seconds)</label>
                     <comment>Maximum wait for one translation (30–1800).</comment>
@@ -58,17 +63,22 @@
 
             <group id="language" translate="label comment" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
                 <label>Language</label>
-                <comment><![CDATA[Each store view needs a Supertext language. A store view whose locale (<em>General → Locale Options → Locale</em>) is one of Supertext's codes (de_CH → de-CH, fr_FR → fr-FR) uses it as it is; every other locale (es_ES, nl_NL, zh_Hans_CN, …) needs its Supertext language here. Supertext never guesses a region. Choose the store view in the <em>Scope</em> switcher at the top to set these per store view.]]></comment>
+                <comment><![CDATA[Each store view is translated into a Supertext language. A store view whose locale (<em>General → Locale Options → Locale</em>) is one of Supertext's codes (de_CH → de-CH, fr_FR → fr-FR) uses it as it is; most other locales have a default (es_ES → es, nl_NL → nl, zh_Hans_CN → zh-Hans). Only a locale without one (en_IE, de_LI, …) needs its Supertext language here, and any store view can choose another one. Choose the store view in the <em>Scope</em> switcher at the top to set these per store view.]]></comment>
                 <field id="overview" translate="label" sortOrder="5" showInDefault="1" showInWebsite="0" showInStore="0">
                     <label>Store views</label>
                     <frontend_model>Supertext\Translation\Block\Adminhtml\System\Config\LanguageOverview</frontend_model>
                 </field>
                 <field id="code" translate="label comment" type="select" sortOrder="10" showInDefault="0" showInWebsite="0" showInStore="1">
                     <label>Supertext language</label>
-                    <comment>Supertext's own codes. Empty: the store view's locale, if it equals one of them. Also used as the source language for the default store view (only the language counts: de-CH → de).</comment>
+                    <comment>Supertext's languages. Empty: the default for the store view's locale, named in the list. Also used as the source language for the default store view (only the language counts: de-CH → de).</comment>
                     <source_model>Supertext\Translation\Model\Config\Source\TargetLanguage</source_model>
                     <frontend_model>Supertext\Translation\Block\Adminhtml\System\Config\LanguageSelect</frontend_model>
                     <backend_model>Supertext\Translation\Model\Config\Backend\LanguageCode</backend_model>
+                </field>
+                <field id="review" translate="label comment" type="select" sortOrder="15" showInDefault="0" showInWebsite="0" showInStore="1">
+                    <label>Translation review</label>
+                    <comment>Translations into this store view go through Supertext's review service, so reviewers can check and correct them on the website with the Supertext Localization Review extension. Their corrections are used the next time the item is translated.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
                 <field id="tone" translate="label comment" type="select" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Tone</label>

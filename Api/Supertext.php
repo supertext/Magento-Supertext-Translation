@@ -30,6 +30,13 @@ final class Supertext
     public const STAGING = 'https://api.staging.supertext.com/v1/';
     public const TESTING = 'https://api.testing.supertext.com/v1/';
 
+    /**
+     * Supertext's review service (translation proxy of Supertext Localization Review). It speaks the
+     * same API and forwards to the live Supertext API with the module's key, keeping every translation
+     * so reviewers can correct them on the website. Used for store views with *Translation review* on.
+     */
+    public const REVIEW_URL = 'https://localizationreview-production.up.railway.app/v1/';
+
     public const SIGNUP_URL  = 'https://www.supertext.com/person/en/account/signin';
     public const API_KEY_URL = 'https://www.supertext.com/en/integrations/api';
 
@@ -52,6 +59,17 @@ final class Supertext
             transport: $transport,
             sleep: $sleep,
         );
+    }
+
+    /**
+     * The review service's base URL for $baseUrl, or null when review is off: an empty $reviewUrl,
+     * or the same URL as the API (then there is no second client).
+     */
+    public static function reviewBaseUrl(string $reviewUrl, string $baseUrl): ?string
+    {
+        $reviewUrl = trim($reviewUrl);
+
+        return $reviewUrl === '' || rtrim($reviewUrl, '/') === rtrim(trim($baseUrl), '/') ? null : $reviewUrl;
     }
 
     /** Supertext shows the key as "Supertext-Auth-Key <key>"; accept it with or without that prefix. */
@@ -135,13 +153,13 @@ final class Supertext
 
         if ($e->targetLang === null && $e->sourceLang !== null) {
             return [
-                'The source language "%1" (the default locale) has no Supertext language yet. An administrator can choose it under Stores → Configuration → Supertext → Translation → Language, with the default store view selected as Scope.',
+                'The source language "%1" (the default locale) has no Supertext language yet. An administrator can choose it in the Supertext language list under Stores → Configuration → Supertext → Translation → Language, with the default store view selected as Scope.',
                 [$code],
             ];
         }
 
         return [
-            'The language "%1" has no Supertext language yet. An administrator can choose it under Stores → Configuration → Supertext → Translation → Language, with this store view selected as Scope.',
+            'The language "%1" has no Supertext language yet. An administrator can choose it in the Supertext language list under Stores → Configuration → Supertext → Translation → Language, with this store view selected as Scope.',
             [$code],
         ];
     }
