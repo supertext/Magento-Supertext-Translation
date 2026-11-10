@@ -17,7 +17,7 @@ use Supertext\Sdk\V1\SupertextException as SdkException;
 
 /**
  * The module's access to Supertext: the vendored Supertext SDK (lib/supertext-sdk,
- * https://github.com/Supertext/Supertext-API-SDK-and-Guide) with this module's defaults, and its
+ * https://github.com/Supertext/Supertext-API-SDK-Guide) with this module's defaults, and its
  * errors turned into messages the admin translates. The SDK handles the protocol: auth header,
  * multipart upload, HTTP 429 retries, polling, cleanup and packing texts into
  * documents.
