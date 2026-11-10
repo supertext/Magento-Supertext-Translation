@@ -4,6 +4,10 @@ All notable changes to this project are documented here.
 
 ## Unreleased
 
+## 1.0.0 — 2026-11-10
+
+First stable release. Every plugin release is now tested end to end against the live Supertext API (`.github/workflows/e2e.yml`).
+
 - Added: support for Mage-OS 4.0 (needs PHP 8.3 or later); CI now tests Mage-OS 3.6.0 and 4.0.0. The demo stays on Mage-OS 3.6.
 - Added: demo movie in the README (`docs/images/demo.gif`): an editor translates a product into German and French and checks the German store view. Recorded by `tests/docs/movie.mjs` against the demo and the stand-in API; the MP4 version has an English voice (Piper voice “alba”, CC BY 4.0). Install and configuration movie (MP4, not committed): `tests/docs/movie-install.mjs` (`npm run movie:install`) shows an administrator installing the module, entering the API key and a store view's Supertext language.
 - Added: the Supertext support form is linked in the README, the user guide and GitHub's "New issue" page.
