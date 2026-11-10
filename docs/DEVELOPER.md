@@ -207,6 +207,30 @@ CI (`.github/workflows/ci.yml`):
 - **magento** (Mage-OS 3.6.0 and 4.0.0): downloads Mage-OS, installs it with MySQL 8.4 and Elasticsearch 8, adds the module in `app/code`, runs `demo/setup.php` twice (the second run must change nothing, and no password may appear in the log), translates the sample product, category, page and block with `supertext:translate` against the stand-in and checks the store values, URL key and rewrite, page copy with Page Builder markup, block directives, link table and accounts; a second run must skip everything. Then it checks the Commando Center: exactly one `installed` report (plugin, key check `ok`, callback URL; never the key) reached the stand-in's fake center, the state is in the `flag` table, and the storefront's ping (through PHP's built-in server and `phpserver/router.php`) answers the challenge with `Cache-Control: no-store` (400 for a bad challenge).
 
 Unit tests worth knowing: `FileExchangeTest` (translation files: reference and file names, export with the planner's segments and the codes, HTML with one item and one store view, errors, import with another plugin, an unknown reference or store view, no ACL, `ok` written through the planner with directives unprotected, `source_changed` only with the option, `untranslated`/`invalid_markup`/`missing` never written, kept fields, a save error, files too large, invalid or without metadata), `LanguageCodesTest` (exact matches, the SDK defaults, no guessing without a default, the select's options and localized names, the setting wins, sources, `unsupported_language`), `ReportingTest` (the report and the stored state never contain the key, the SDK version reported, a state stored by the SDK 0.2 reporter kept without a new report, `installed` → `settings_saved`, `upgraded` only after a version change, a 401 reported once without a request to Supertext, nothing sent with reports off, storage errors swallowed, ping answers, `SUPERTEXT_VERSION_REPORTS`), `SupertextClientsTest` (Translation review, see *Supertext API protocol*), `SupertextTest` (codes sent as given, one message per SDK error code).
+`.github/workflows/checks.yml` and `links.yml` lint the workflows and check the links. `.github/workflows/e2e.yml` runs the end-to-end test against the real Supertext API and regenerates the docs screenshots (see *End-to-end tests*).
+
+Unit tests worth knowing: `LanguageCodesTest` (exact matches, no default regions, the setting wins, sources, `unsupported_language`), `ReportingTest` (the report and the stored state never contain the key, the SDK version reported, a state stored by the SDK 0.2 reporter kept without a new report, `installed` → `settings_saved`, `upgraded` only after a version change, a 401 reported once without a request to Supertext, nothing sent with reports off, storage errors swallowed, ping answers, `SUPERTEXT_VERSION_REPORTS`), `SupertextTest` (codes sent as given, one message per SDK error code).
+
+## End-to-end tests
+
+The unit tests and the **magento** CI job use fakes or the stand-in. `.github/workflows/e2e.yml` also tests against the **real Supertext API**, so changes on Supertext's side (language codes, regional variants, formatting, rate limits) show up. It runs on every push to `main` that touches the module, the demo or the tests, on pull requests that change the E2E test or workflow, every Monday (05:30 UTC), and by hand (*Actions → E2E → Run workflow*). It builds the demo image once (Docker layer cache in GitHub Actions) and starts it twice on the runner's network, next to a MySQL 8.4 and an Elasticsearch 8 service, each with its own database (`MAGENTO_DB_NAME`), index prefix and demo accounts made up for the run:
+
+1. **Real API** (repository or organization secret `SUPERTEXT_API_KEY`; without it these steps are skipped with a warning). Version reports are off (`SUPERTEXT_VERSION_REPORTS=0`), so CI runs don't appear in the Commando Center.
+   - `tests/e2e/features.mjs` asks the live `GET features` (cost-free, no module or SDK code) whether every pair the demo translates (`en` → `de-CH`, `fr-CH`, `it-CH`) is offered; a missing pair fails the run. Whether the module's own language list matches the API is the SDK's job (its own tests).
+   - `tests/e2e/live.mjs` (Playwright) logs in as the demo **editor** (`DEMO_EDITOR_*`, role *Supertext editor*) and translates through the admin, like an editor would: the two sample products and the CMS page and block with the grids' mass action *Translate with Supertext*, the category with its edit page's button, each time into all three store views on the translate page. The page must show no warning, every store view must have its Supertext language (`de-CH`, `fr-CH`, `it-CH`), and every item × store view must end without an error. Then the database is checked: products and the category have store-view values for every field the source has, the page and block have a copy per store view (`supertext_translation_link`) assigned only to that store view and with the original's status (setting *Same as the original*), store-view status of products and categories is untouched, every field is filled and at least 80 % of them changed (a name can stay the same), nothing of the protocol is left (`data-st-id`, `data-st-ph`, `st-ph-`, `data-st-keep`, `translate="no"`), links, bold, italics, list items, headings, paragraphs, Page Builder elements and every `{{…}}` directive are kept, the text is in the target language (common words of each language counted) and de-CH has no "ß". A second run with *Overwrite existing translations* must update the same records: no new store values, CMS copies or links. A URL key that stays the default one is printed as a `note`. Each run translates the sample content twice into three languages (around 10,000 characters on the key's account).
+2. **Stand-in API**: the docs screenshots (see *Docs screenshots*), so the images don't change with each machine translation. If `docs/images/` changed, a second job pushes the branch `automation/docs-screenshots` and opens (or updates) the pull request "Docs: regenerate screenshots". This needs *Settings → Actions → General → Allow GitHub Actions to create and approve pull requests*.
+
+If a run fails, the artifact `e2e-debug` has the translate pages as screenshots, the demo containers' logs and `var/log`, and the stand-in log. Locally:
+
+```bash
+cd tests/e2e && npm ci && npx playwright install chromium
+# a fresh demo (new database) with a real SUPERTEXT_API_KEY, e.g. on port 8081
+SUPERTEXT_API_KEY=… E2E_TARGETS=de-CH,fr-CH,it-CH node features.mjs
+MAGENTO_URL=http://127.0.0.1:8081 DATABASE_URL=mysql://root:root@127.0.0.1:3306/magento \
+  EDITOR_EMAIL=… EDITOR_PASSWORD=… npm run live
+```
+
+`live.mjs` also runs against the stand-in API (`SUPERTEXT_API_ENDPOINT`), which is how to try changes to it without a key; there the language and "texts changed" checks may fail for segments the stand-in doesn't know.
 
 ## Demo (Railway)
 
@@ -258,7 +282,7 @@ The first start takes a few minutes (Magento's installer and the first reindex);
 `tests/docs/screenshots.mjs` regenerates `docs/images/` with Playwright from a freshly started demo (empty database) whose module talks to `tests/docs/stand-in.mjs`. The stand-in answers like the Supertext API and returns real German, French and Italian for the sample content (`tests/docs/samples.json`, keyed by the HTML the module sends, directives protected); the settings screenshots show the live API, because the endpoint comes from `SUPERTEXT_API_ENDPOINT`. The script works with Magento's secret keys in admin URLs: it opens pages from the admin menu's links and adds `/store/<id>/` before the key for a store view's scope.
 
 ```bash
-cd tests/docs && npm install && npx playwright install chromium
+cd tests/docs && npm ci && npx playwright install chromium
 node stand-in.mjs &
 # a fresh demo running with SUPERTEXT_API_ENDPOINT=http://127.0.0.1:8765/v1/,
 # SUPERTEXT_REPORT_URL=http://127.0.0.1:8765/report (version reports go to the stand-in),
@@ -267,7 +291,7 @@ BASE_URL=http://localhost:8091/admin DEMO_ADMIN_EMAIL=… DEMO_ADMIN_PASSWORD=�
   DEMO_EDITOR_EMAIL=… DEMO_EDITOR_PASSWORD=… node screenshots.mjs
 ```
 
-`ONLY=admin` or `ONLY=editor` runs one part. Run it in the same commit as any UI change the images show.
+`ONLY=admin` or `ONLY=editor` runs one part. Run it in the same commit as any UI change the images show. The E2E workflow runs it on every push to `main` too and opens a pull request when the images changed (see *End-to-end tests*). So that the images only change when the UI does, the script shows a fixed time in the key check's *Checked:* line, leaves the date columns (*Created*, *Modified*, *Last Updated At*) out of the grids, and replaces the demo's local address (the ping address) with `https://shop.example.com`. The stand-in logs segments it has no translation for as `{"unknown": …}`; the workflow warns about them.
 
 ## Demo movie
 

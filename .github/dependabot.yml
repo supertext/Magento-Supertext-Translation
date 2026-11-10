@@ -11,7 +11,7 @@ updates:
       actions:
         patterns: ["*"]
   - package-ecosystem: "npm"
-    directory: "/tests/docs"
+    directories: ["/tests/docs", "/tests/e2e"]
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5

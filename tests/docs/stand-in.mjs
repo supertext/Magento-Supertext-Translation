@@ -4,7 +4,7 @@
  * returns German, French and Italian for the demo's sample products, category, page and block
  * (samples.json: human translations of demo/sample-content.json, keyed by the target
  * language's primary subtag).
- * Unknown text comes back as "[<target>] text". Listens on :8765 (any API key).
+ * Unknown text comes back as "[<target>] text" (logged as {"unknown": …}). Listens on :8765 (any API key).
  *
  * Also a fake Commando Center, so screenshots and CI never report to the live one: run Magento
  * with SUPERTEXT_REPORT_URL=http://127.0.0.1:8765/report. POST /report answers 202 and keeps the
@@ -71,6 +71,7 @@ http
     const html = file.html.replace(/(<div data-st-id="\d+">)([\s\S]*?)(<\/div>\n)/g, (all, open, inner, close) => {
       const hit = known.get(norm(inner)) ?? known.get(norm(decode(inner)))
       if (hit !== undefined) return open + (known.has(norm(inner)) ? hit : encode(hit)) + close
+      console.log(JSON.stringify({ unknown: norm(inner), target: file.target }))
       return open + inner.replace(/>([^<]+)</g, (m, t) => (t.trim() ? `>[${file.target}] ${t}<` : m)).replace(/^([^<]+)/, `[${file.target}] $1`) + close
     })
     send(200, html, 'text/html')

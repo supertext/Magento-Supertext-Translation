@@ -29,14 +29,25 @@ async function session(email, password) {
   if (!email || !password) throw new Error('Set the DEMO_* email and password variables.')
   const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage()
   page.setDefaultTimeout(180000)
+  const css = '*{animation:none!important;transition:none!important;caret-color:transparent!important} .admin__data-grid-loading-mask,.loading-mask{display:none!important} .message-system,.admin__page-nav-title-messages{display:none!important}'
+  // On every page before measuring: hidden system messages would otherwise move the crop.
+  await page.addInitScript((style) => document.addEventListener('DOMContentLoaded', () => {
+    const tag = document.createElement('style'); tag.textContent = style; document.head.appendChild(tag)
+  }), css)
   await page.goto(`${B}/`)
   await page.fill('#username', email)
   await page.fill('#login', password)
   await page.click('.action-login')
   await page.waitForLoadState('networkidle')
-  const css = '*{animation:none!important;transition:none!important;caret-color:transparent!important} .admin__data-grid-loading-mask,.loading-mask{display:none!important} .message-system,.admin__page-nav-title-messages{display:none!important}'
   const shot = async (name, clip) => {
     await page.addStyleTag({ content: css })
+    await page.evaluate(([origin]) => {
+      // Times change with every run, so the images would too: show a fixed one.
+      for (const el of document.querySelectorAll('#supertext-key-check small')) el.textContent = el.textContent.replace(/^([^:]+:).*$/s, '$1 Oct 1, 2026, 9:00:00 AM')
+      // No local URLs in the docs: the demo's own address becomes an example shop.
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+      while (walker.nextNode()) if (walker.currentNode.nodeValue.includes(origin)) walker.currentNode.nodeValue = walker.currentNode.nodeValue.replaceAll(origin, 'https://shop.example.com')
+    }, [new URL(B).origin])
     await page.waitForTimeout(400)
     await page.screenshot({ path: `${OUT}/${name}.png`, ...(clip ? { clip } : {}) })
     console.log(`  ${name}.png`)
@@ -45,7 +56,14 @@ async function session(email, password) {
   const go = async (url) => { await page.goto(url); await page.waitForLoadState('networkidle') }
   const menu = async (item) => page.locator(`li.${item} > a`).first().getAttribute('href')
   const grid = async () => { await page.locator('.data-grid tbody tr.data-row').first().waitFor(); await page.waitForTimeout(800) }
-  return { page, shot, box, go, menu, grid }
+  // Dates (Created, Modified, Last Updated At) change with every run: leave those grid columns out.
+  const hideDates = () => page.evaluate(() => {
+    const table = [...document.querySelectorAll('.data-grid')].find((t) => t.offsetParent)
+    const heads = [...table.querySelectorAll('thead th')]
+    const drop = heads.map((th, i) => (/^(Created|Modified|Last Updated At)$/.test(th.textContent.replace(/\s+/g, ' ').trim()) ? i : -1)).filter((i) => i >= 0)
+    for (const row of table.querySelectorAll('tr')) drop.forEach((i) => { if (row.children[i]) row.children[i].style.display = 'none' })
+  })
+  return { page, shot, box, go, menu, grid, hideDates }
 }
 
 // --- Installation guide (Administrators): enters the API key the user guide needs ------
@@ -84,7 +102,7 @@ if (!only || only.has('admin')) {
 
 // --- User guide (editor account) -------------------------------------------------------
 if (!only || only.has('editor')) {
-  const { page, shot, box, go, menu, grid } = await session(process.env.DEMO_EDITOR_EMAIL, process.env.DEMO_EDITOR_PASSWORD)
+  const { page, shot, box, go, menu, grid, hideDates } = await session(process.env.DEMO_EDITOR_EMAIL, process.env.DEMO_EDITOR_PASSWORD)
   const productsUrl = await menu('item-catalog-products')
   const categoriesUrl = await menu('item-catalog-categories')
   const pagesUrl = await menu('item-cms-page')
@@ -93,6 +111,7 @@ if (!only || only.has('editor')) {
   await go(productsUrl)
   await grid()
   for (const row of await page.locator('tr.data-row', { hasText: 'ST-DEMO-' }).all()) await row.locator('input[type=checkbox]').check({ force: true })
+  await hideDates()
   await page.locator('button.action-select', { hasText: 'Actions' }).first().click()
   const item = page.locator('.action-menu-item:visible', { hasText: 'Translate with Supertext' }).first()
   await item.waitFor()
@@ -127,9 +146,17 @@ if (!only || only.has('editor')) {
   await go(pagesUrl)
   await grid()
   await page.setViewportSize({ width: 1280, height: 1300 })
-  await page.fill('.data-grid-search-control', 'delivery-and-returns')
-  await page.keyboard.press('Enter')
-  await page.waitForTimeout(2500)
+  // Filter by URL key (the keyword search doesn't find "delivery-and-returns": MySQL's
+  // full-text search reads the hyphens as "without").
+  await page.locator('button[data-action="grid-filter-expand"]').first().click()
+  await page.locator('.admin__data-grid-filters input[name="identifier"]').fill('delivery-and-returns')
+  await page.locator('button[data-action="grid-filter-apply"]').first().click()
+  await page.waitForFunction(() => {
+    const rows = [...document.querySelectorAll('.data-grid tr.data-row')]
+    return rows.length >= 4 && rows.every((r) => r.textContent.includes('delivery-and-returns'))
+  })
+  await page.waitForTimeout(1500)
+  await hideDates()
   await shot('pages-translated', await box('.data-grid:visible'))
   await page.setViewportSize({ width: 1280, height: 900 })
 
