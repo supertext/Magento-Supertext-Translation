@@ -23,7 +23,7 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           coverage: none
-          tools: phpunit:10.5
+          tools: phpunit:11.5
       - name: Lint
         run: find . -name '*.php' -o -name '*.phtml' | grep -v '^./tests/docs/node_modules' | xargs -n1 php -l
       - name: Unit tests

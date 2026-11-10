@@ -194,7 +194,7 @@ To translate without a Supertext key, run the stand-in API (`node tests/docs/sta
 ## Tests
 
 ```bash
-php phpunit.phar        # PHPUnit 10 (phar): SDK use and error messages, field planner, language codes, reporting, i18n files — no Magento needed
+php phpunit.phar        # PHPUnit 11 (phar): SDK use and error messages, field planner, language codes, reporting, i18n files — no Magento needed
 ./build.sh              # dist/magento-supertext-translation-<version>.zip
 ```
 
@@ -334,6 +334,12 @@ Before starting work in this repo, look at its open findings: code scanning aler
   Known findings that aren't fixed yet go in `phpstan-baseline.neon` (add `--generate-baseline /path/to/magento-supertext-translation/phpstan-baseline.neon`); it holds 20 findings in 9 groups that come from Magento's own typing (repository `save()` taking the model, `getResource()->saveAttribute()`, deprecated `getResource()`, `Zend_Db_Select` from `having()`, `Phrase` titles). Fix new findings instead of adding them.
 - **GitHub settings** (set by Remy's setup script, not in the repo): secret scanning with push protection (a push containing a known token format is rejected; findings under *Security → Secret scanning*) and CodeQL default setup (findings under *Security → Code scanning* and as pull request comments). CodeQL doesn't cover PHP, which is why this repo runs PHPStan.
 - `.github/workflows/support-triage.yml`: support requests from the Supertext integrations website arrive as issues labelled `support` (contact details stay in the Supertext CMS). Claude classifies each one: answers questions (marked `<!-- supertext:reply -->`, emailed to the sender by the CMS) and closes them, fixes bugs as pull requests for review (never merged automatically), labels feature requests `feature-request`. Only people with triage rights can add labels, so outsiders can't start it. Needs the organisation secret `ANTHROPIC_API_KEY`; the workflow is the same in every Supertext repo.
+
+## Dependency updates
+
+Dependabot (`.github/dependabot.yml`) opens weekly pull requests: minor and patch updates grouped into one, GitHub Actions in another, each major update on its own.
+
+`.github/workflows/dependabot-merge.yml` merges a minor or patch package update by itself once every other check on its pull request has passed (it waits up to 85 minutes and leaves the pull request alone if a check fails). GitHub Actions updates and majors stay for a person: the workflow's built-in token can't merge changes to workflow files, and a major needs a decision. Merges by the workflow don't start CI on `main`; the weekly health check looks at `main`.
 
 ## Releasing
 
