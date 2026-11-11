@@ -59,7 +59,7 @@ jobs:
           --health-cmd="mysqladmin ping -proot"
           --health-interval=5s --health-timeout=5s --health-retries=20
       elasticsearch:
-        image: elasticsearch:8.17.10
+        image: elasticsearch:8.19.25
         env:
           discovery.type: single-node
           xpack.security.enabled: 'false'

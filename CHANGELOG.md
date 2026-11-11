@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## Unreleased
 
+- Changed: the demo runs Mage-OS 4.0.0 (was 3.6.0); CI and the local setup use Elasticsearch 8.19 (8.19.25) instead of 8.17, which reached end of life in August 2025.
+
 ## 1.0.0 — 2026-11-10
 
 First stable release. Every plugin release is now tested end to end against the live Supertext API (`.github/workflows/e2e.yml`).

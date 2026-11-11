@@ -4,7 +4,7 @@ For administrators setting up the module in a Magento 2 shop (Magento Open Sourc
 
 ## Just want to try it?
 
-A ready-to-run container with Mage-OS 3.6 (Magento 2.4.9), English sample products, a category, a CMS page and a block, store views for German (Switzerland), French (Switzerland) and Italian (Switzerland), and this module is in `demo/`. It is also what runs the public Supertext demo. See the *Demo* section of the [developer guide](DEVELOPER.md#demo-railway).
+A ready-to-run container with Mage-OS 4.0, English sample products, a category, a CMS page and a block, store views for German (Switzerland), French (Switzerland) and Italian (Switzerland), and this module is in `demo/`. It is also what runs the public Supertext demo. See the *Demo* section of the [developer guide](DEVELOPER.md#demo-railway).
 
 ## Requirements
 

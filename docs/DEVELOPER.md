@@ -174,8 +174,8 @@ Mage-OS installs without Adobe Marketplace keys (Magento Open Source from `repo.
 
 ```bash
 docker run -d --name mysql -p 3306:3306 -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=magento mysql:8.4
-docker run -d --name es -p 9200:9200 -e discovery.type=single-node -e xpack.security.enabled=false elasticsearch:8.17.10
-composer create-project --repository-url=https://repo.mage-os.org/ mage-os/project-community-edition:3.6.0 magento
+docker run -d --name es -p 9200:9200 -e discovery.type=single-node -e xpack.security.enabled=false elasticsearch:8.19.25
+composer create-project --repository-url=https://repo.mage-os.org/ mage-os/project-community-edition:4.0.0 magento
 cd magento
 bin/magento setup:install --base-url=http://127.0.0.1:8082/ --db-host=127.0.0.1 --db-name=magento --db-user=root \
   --db-password=root --search-engine=elasticsearch8 --elasticsearch-host=127.0.0.1 --admin-user=admin \
@@ -234,7 +234,7 @@ MAGENTO_URL=http://127.0.0.1:8081 DATABASE_URL=mysql://root:root@127.0.0.1:3306/
 
 ## Demo (Railway)
 
-`demo/` is a Mage-OS 3.6 shop with English sample content and store views for German (Switzerland), French (Switzerland) and Italian (Switzerland), plus this module. The Railway service *Magento* (project *supertext-cms-demos-php*) builds `demo/Dockerfile` with the repository root as context, from `main`. Railway no longer reads `railway.json`, so the Dockerfile path, healthcheck (`/health`, a static file) and restart policy are set on the service itself; `railway.json` documents the same values.
+`demo/` is a Mage-OS 4.0 shop with English sample content and store views for German (Switzerland), French (Switzerland) and Italian (Switzerland), plus this module. The Railway service *Magento* (project *supertext-cms-demos-php*) builds `demo/Dockerfile` with the repository root as context, from `main`. Railway no longer reads `railway.json`, so the Dockerfile path, healthcheck (`/health`, a static file) and restart policy are set on the service itself; `railway.json` documents the same values.
 
 The image downloads Mage-OS with Composer at build time (no keys needed), copies the module to `app/code`, enables all modules except `Magento_TwoFactorAuth` (demo convenience: Supertext staff log in with the `DEMO_*` accounts only) and runs Apache with `pub/` as document root. The container keeps **no files** between deploys:
 
@@ -324,7 +324,7 @@ Before starting work in this repo, look at its open findings: code scanning aler
 - **PHPStan** (job **phpstan** in `ci.yml`, configuration `phpstan.neon`): level 5 on `Api/`, `Block/`, `Console/`, `Controller/`, `Model/`, `Observer/` and `registration.php` (not the templates, `demo/` or the tests). PHPStan has to know Magento's classes, so it runs from a Mage-OS root (no database needed) with [bitexpert/phpstan-magento](https://github.com/bitExpert/phpstan-magento), which also understands the generated factories and proxies. Locally:
 
   ```bash
-  composer create-project --no-dev --repository-url=https://repo.mage-os.org/ mage-os/project-community-edition:3.6.0 /tmp/mageos
+  composer create-project --no-dev --repository-url=https://repo.mage-os.org/ mage-os/project-community-edition:4.0.0 /tmp/mageos
   cd /tmp/mageos
   composer config allow-plugins.phpstan/extension-installer true
   composer require --dev --with-all-dependencies phpstan/phpstan:^2.1 phpstan/extension-installer bitexpert/phpstan-magento

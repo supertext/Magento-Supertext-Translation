@@ -48,7 +48,7 @@ Then enter your API key in *Stores → Configuration → Supertext → Translati
 
 ## Demo
 
-`demo/` is a Mage-OS 3.6 (Magento 2.4.9) shop with English sample products, a category, a CMS page and a block, plus store views for German (Switzerland), French (Switzerland) and Italian (Switzerland), deployed to Railway from this repository. See the [developer guide](docs/DEVELOPER.md#demo-railway).
+`demo/` is a Mage-OS 4.0 shop with English sample products, a category, a CMS page and a block, plus store views for German (Switzerland), French (Switzerland) and Italian (Switzerland), deployed to Railway from this repository. See the [developer guide](docs/DEVELOPER.md#demo-railway).
 
 ## Changelog and roadmap
 
