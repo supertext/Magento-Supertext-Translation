@@ -234,7 +234,7 @@ MAGENTO_URL=http://127.0.0.1:8081 DATABASE_URL=mysql://root:root@127.0.0.1:3306/
 
 ## Demo (Railway)
 
-`demo/` is a Mage-OS 4.0 shop with English sample content and store views for German (Switzerland), French (Switzerland) and Italian (Switzerland), plus this module. The Railway service *Magento* (project *supertext-cms-demos-php*) builds `demo/Dockerfile` with the repository root as context, from `main`. Railway no longer reads `railway.json`, so the Dockerfile path, healthcheck (`/health`, a static file) and restart policy are set on the service itself; `railway.json` documents the same values.
+`demo/` is a Mage-OS 3.6 shop with English sample content and store views for German (Switzerland), French (Switzerland) and Italian (Switzerland), plus this module. The Railway service *Magento* (project *supertext-cms-demos-php*) builds `demo/Dockerfile` with the repository root as context, from `main`. Railway no longer reads `railway.json`, so the Dockerfile path, healthcheck (`/health`, a static file) and restart policy are set on the service itself; `railway.json` documents the same values.
 
 The image downloads Mage-OS with Composer at build time (no keys needed), copies the module to `app/code`, enables all modules except `Magento_TwoFactorAuth` (demo convenience: Supertext staff log in with the `DEMO_*` accounts only) and runs Apache with `pub/` as document root. The container keeps **no files** between deploys:
 
