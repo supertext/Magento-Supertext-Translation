@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 /**
- * Regenerates docs/images from a freshly started demo (empty database) whose module talks
- * to stand-in.mjs (SUPERTEXT_API_ENDPOINT=http://127.0.0.1:8765/v1/, no SUPERTEXT_API_KEY:
- * the script enters a key in the configuration). See docs/DEVELOPER.md -> Docs screenshots.
+ * Regenerates docs/images from a freshly started demo (empty database). With DOCS_API_KEY (CI: the
+ * secret SUPERTEXT_API_KEY) the module translates with the real Supertext API; without it, start the
+ * demo with SUPERTEXT_API_ENDPOINT=http://127.0.0.1:8765/v1/ (stand-in.mjs). Never SUPERTEXT_API_KEY:
+ * the script enters the key in the configuration. See docs/DEVELOPER.md -> Docs screenshots.
  *
  *   BASE_URL (default http://localhost:8091/admin)
  *   DEMO_ADMIN_EMAIL / DEMO_ADMIN_PASSWORD     configuration screens (Administrators)
  *   DEMO_EDITOR_EMAIL / DEMO_EDITOR_PASSWORD   translating (role "Supertext editor")
+ *   DOCS_API_KEY                               Supertext API key entered in the configuration (default: any key, for the stand-in)
  *
  * Works with Magento's secret keys in admin URLs: pages are opened from menu links, and a
  * store view scope is added as /store/<id>/ before the key.
@@ -78,7 +80,7 @@ if (!only || only.has('admin')) {
   for (const g of ['api', 'language', 'cms']) {
     if (!(await page.locator(`#supertext_${g}`).isVisible())) await page.click(`#supertext_${g}-head`)
   }
-  await page.fill('#supertext_api_api_key', 'Supertext-Auth-Key docs-demo-key')
+  await page.fill('#supertext_api_api_key', process.env.DOCS_API_KEY || 'Supertext-Auth-Key docs-demo-key')
   await page.click('#save')
   await page.waitForLoadState('networkidle')
   await page.click('#supertext-test-connection')

@@ -196,6 +196,8 @@ The module's admin screens (configuration, *Translate with Supertext* page, butt
 | unreachable | *The API key couldn't be checked because Supertext can't be reached. …* |
 | error | *The API key couldn't be checked: Supertext answered with an error (…).* |
 
+**Send configuration to Supertext** (under *Send version information to Supertext*, field *Configuration for Supertext support*) sends Supertext, on demand, the modules installed in the shop (Composer package name and version, enabled or not; Magento's and Mage-OS's own modules are left out) and the Supertext language of each store view, so Supertext support can help with a setup question. It sends nothing else, and only while version information is on and saved; the message then says how many modules and store views were sent.
+
 **The ping endpoint** `https://<your shop>/supertext/ping?challenge=…` (`/index.php/supertext/ping` without URL rewrites; the configuration shows the exact address under the setting) is public (no login, no form key) and answers only `{"ok":true,"plugin":"Magento-Supertext-Translation","challenge":"…"}`, so Supertext can see that the shop is reachable from the internet. It returns nothing else: no versions, no settings, no data, and it is sent with `Cache-Control: no-store`, so neither Magento's full-page cache nor Varnish keeps it. If a firewall, a CDN or a maintenance page sits in front of the shop, let this URL through uncached.
 
 The module keeps this state (what was reported last, the latest key check, the key's fingerprint) in Magento's `flag` table under the code `supertext_reporter`.

@@ -145,7 +145,30 @@ final class ReportingTest extends TestCase
 
         self::assertNull($this->reporting()->onRequest(self::KEY)?->event);
         self::assertSame([], $this->calls);
-        self::assertSame($before, $this->state, 'stored in the same format');
+        // Plugin Health 0.2+ adds keyChecks and reportedKeyStatuses (null with one key); everything else is kept.
+        self::assertSame(json_decode($before, true) + ['keyChecks' => null, 'reportedKeyStatuses' => null], json_decode((string) $this->state, true), 'stored in the same format');
+    }
+
+    public function testSendConfigurationSendsModulesAndTheLanguageMapping(): void
+    {
+        $modules   = [['name' => 'amasty/module-gift-card', 'version' => '2.14.0', 'active' => true, 'type' => 'module'], ['name' => 'Vendor_Old', 'version' => null, 'active' => false, 'type' => 'module']];
+        $languages = [['code' => 'default:en_US', 'supertext' => 'en-US'], ['code' => 'de:de_CH', 'supertext' => 'de-CH'], ['code' => 'ie:en_IE', 'supertext' => null]];
+
+        $result = $this->reporting()->sendConfiguration($modules, $languages);
+
+        self::assertSame('extensions', $result?->event);
+        self::assertTrue($result->sent);
+        [$report] = $this->reports();
+        self::assertSame('extensions', $report['event']);
+        // A module without a version is sent without the field.
+        self::assertSame([$modules[0], ['name' => 'Vendor_Old', 'active' => false, 'type' => 'module']], $report['extensions']);
+        self::assertSame($languages, $report['languages']);
+    }
+
+    public function testSendConfigurationSendsNothingWithReportsOff(): void
+    {
+        self::assertFalse((bool) $this->reporting(enabled: false)->sendConfiguration([['name' => 'a/b']], [['code' => 'de:de_CH', 'supertext' => 'de-CH']])?->sent);
+        self::assertSame([], $this->reports());
     }
 
     public function testRejectedTranslationIsReportedOnce(): void

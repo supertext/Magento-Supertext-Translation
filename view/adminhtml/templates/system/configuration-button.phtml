@@ -1,0 +1,27 @@
+<?php
+/**
+ * @var \Supertext\Translation\Block\Adminhtml\System\Config\ConfigurationButton $block
+ * @var \Magento\Framework\Escaper $escaper
+ * @var \Magento\Framework\View\Helper\SecureHtmlRenderer $secureRenderer
+ */
+?>
+<button type="button" class="action-default" id="supertext-send-configuration">
+    <span><?= $escaper->escapeHtml(__('Send configuration to Supertext')) ?></span>
+</button>
+<div id="supertext-configuration-result" class="message" style="display:none;margin-top:10px"><div></div></div>
+<p class="note"><span><?= $escaper->escapeHtml(__('Sends Supertext the modules installed in this shop (name, version, enabled or not) and the Supertext language of each store view, so Supertext support can help better. Nothing else is sent.')) ?></span></p>
+<?php
+$script = 'require(["jquery"], function ($) {
+    $("#supertext-send-configuration").on("click", function () {
+        var box = $("#supertext-configuration-result");
+        $.ajax({ url: ' . json_encode($block->getSendUrl()) . ', method: "POST", dataType: "json", data: { form_key: window.FORM_KEY }, showLoader: true })
+            .done(function (data) {
+                box.attr("class", "message " + (data.ok ? "message-success success" : "message-error error")).show().children("div").html(data.html);
+            })
+            .fail(function () {
+                box.attr("class", "message message-error error").show().children("div").text(' . json_encode((string) __('The configuration couldn\'t be sent. Try again later.')) . ');
+            });
+    });
+});';
+?>
+<?= /* @noEscape */ $secureRenderer->renderTag('script', [], $script, false) ?>

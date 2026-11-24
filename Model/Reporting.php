@@ -13,6 +13,9 @@ namespace Supertext\Translation\Model;
 use Magento\Framework\App\ProductMetadataInterface;
 use Magento\Framework\Escaper;
 use Magento\Framework\FlagManager;
+use Magento\Framework\Module\FullModuleList;
+use Magento\Framework\Module\ModuleListInterface;
+use Magento\Framework\Module\PackageInfo;
 use Magento\Framework\Stdlib\DateTime\TimezoneInterface;
 use Magento\Framework\UrlInterface;
 use Magento\Store\Model\Store;
@@ -42,6 +45,9 @@ class Reporting
         private readonly TimezoneInterface $timezone,
         private readonly Escaper $escaper,
         private readonly LoggerInterface $logger,
+        private readonly FullModuleList $fullModuleList,
+        private readonly ModuleListInterface $moduleList,
+        private readonly PackageInfo $packageInfo,
     ) {
     }
 
@@ -87,6 +93,64 @@ class Reporting
 
         $this->scheduled = true;
         $this->later(fn () => $this->glue()?->onRequest($this->config->apiKey()));
+    }
+
+    /**
+     * "Send configuration to Supertext": the installed modules (not Magento's or Mage-OS's own) and
+     * every store view's locale with its Supertext language, in one report.
+     *
+     * @return array{sent: bool, extensions: int, languages: int}|null null with reports off
+     */
+    public function sendConfiguration(): ?array
+    {
+        if (!$this->enabled()) {
+            return null;
+        }
+
+        $extensions = $this->installedModules();
+        $languages  = [];
+
+        foreach ($this->config->storeViews() as $store) {
+            $languages[] = ['code' => $store['code'] . ':' . $store['locale'], 'supertext' => $store['target']];
+        }
+
+        $result = $this->glue()?->sendConfiguration($extensions, $languages);
+
+        return ['sent' => (bool) $result?->sent, 'extensions' => \count($extensions), 'languages' => \count($languages)];
+    }
+
+    /**
+     * Installed modules except Magento's and Mage-OS's own: Composer package name and version where
+     * there is one, enabled or not.
+     *
+     * @return list<array{name: string, version: ?string, active: bool, type: string}>
+     */
+    public function installedModules(): array
+    {
+        $out = [];
+
+        try {
+            foreach ($this->fullModuleList->getNames() as $module) {
+                if (str_starts_with($module, 'Magento_') || str_starts_with($module, 'MageOS_')) {
+                    continue;
+                }
+
+                $package = (string) $this->packageInfo->getPackageName($module);
+                $version = (string) $this->packageInfo->getVersion($module);
+                $out[]   = [
+                    'name'    => $package !== '' ? $package : $module,
+                    'version' => $version !== '' ? ltrim($version, 'v') : null,
+                    'active'  => $this->moduleList->has($module),
+                    'type'    => 'module',
+                ];
+            }
+        } catch (\Throwable) {
+            // A report without modules still has the languages.
+        }
+
+        usort($out, static fn (array $a, array $b): int => strcmp($a['name'], $b['name']));
+
+        return $out;
     }
 
     /** The latest stored key check, for the settings page. */

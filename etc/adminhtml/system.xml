@@ -59,6 +59,10 @@
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                     <frontend_model>Supertext\Translation\Block\Adminhtml\System\Config\VersionReports</frontend_model>
                 </field>
+                <field id="send_configuration" translate="label" sortOrder="55" showInDefault="1" showInWebsite="0" showInStore="0">
+                    <label>Configuration for Supertext support</label>
+                    <frontend_model>Supertext\Translation\Block\Adminhtml\System\Config\ConfigurationButton</frontend_model>
+                </field>
             </group>
 
             <group id="language" translate="label comment" sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">

@@ -4,6 +4,9 @@ All notable changes to this project are documented here.
 
 ## Unreleased
 
+- Added: **Send configuration to Supertext** in *Stores → Configuration → Supertext → Translation*: sends Supertext the installed modules (name, version, enabled or not) and the Supertext language of each store view, so Supertext support can help better. Nothing is sent while version information is off. All four interface languages. Supertext Plugin Health 0.4.0.
+- Changed: the screenshots in the guides show real Supertext translations (the E2E workflow takes them with the live API; version reports still go to the stand-in).
+
 - Changed: the demo runs Mage-OS 4.0.0 (was 3.6.0); it disables Mage-OS 4's passkey login (`MageOS_PasskeyAuth`) together with two-factor authentication, which it depends on.
 - Changed: CI and the local setup use Elasticsearch 8.19 (8.19.25) instead of 8.17, which reached end of life in August 2025.
 

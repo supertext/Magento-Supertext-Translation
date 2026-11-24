@@ -59,7 +59,7 @@ $VERSION, commit \`$COMMIT\`, namespace \`Supertext\\PluginHealth\` (unchanged).
 Don't edit these files: fix them in Commando-Center-Supertext-Translation/plugin-health, then run
 \`scripts/vendor-plugin-health.sh\`.
 EOF
-if [ -n "$(grep -rL '^namespace Supertext\\PluginHealth' "$DEST/src")" ]; then
+if [ -n "$(grep -rL --include='*.php' '^namespace Supertext\\PluginHealth' "$DEST/src")" ]; then
     echo "vendor-plugin-health: a file in $DEST/src is outside the Supertext\\PluginHealth namespace" >&2
     exit 1
 fi
