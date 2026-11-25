@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        php: ['8.2', '8.3', '8.4', '8.5']
+        php: ['8.2', '8.3', '8.4', '8.5', '8.6']
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -106,7 +106,7 @@ jobs:
         ports: ['3306:3306']
         options: --health-cmd "mysqladmin ping -proot" --health-interval 5s --health-timeout 5s --health-retries 20
       elasticsearch:
-        image: elasticsearch:8.19.25
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.19.26
         env:
           discovery.type: single-node
           xpack.security.enabled: 'false'
@@ -126,7 +126,7 @@ jobs:
           tools: composer:v2
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '26'
       - name: Start the stand-in API
         run: nohup node module/tests/docs/stand-in.mjs > standin.log 2>&1 &
       - name: Download Mage-OS

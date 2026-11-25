@@ -175,7 +175,7 @@ Mage-OS installs without Adobe Marketplace keys (Magento Open Source from `repo.
 
 ```bash
 docker run -d --name mysql -p 3306:3306 -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=magento mysql:8.4
-docker run -d --name es -p 9200:9200 -e discovery.type=single-node -e xpack.security.enabled=false elasticsearch:8.19.25
+docker run -d --name es -p 9200:9200 -e discovery.type=single-node -e xpack.security.enabled=false docker.elastic.co/elasticsearch/elasticsearch:8.19.26
 composer create-project --repository-url=https://repo.mage-os.org/ mage-os/project-community-edition:4.0.0 magento
 cd magento
 bin/magento setup:install --base-url=http://127.0.0.1:8082/ --db-host=127.0.0.1 --db-name=magento --db-user=root \
@@ -203,7 +203,7 @@ The module's `composer.json` requires `magento/*` packages, which aren't on Pack
 
 CI (`.github/workflows/ci.yml`):
 
-- **unit** (PHP 8.2, 8.3, 8.4, 8.5): lint (`.php`, `.phtml`), PHPUnit, XML well-formedness, `sh -n demo/entrypoint.sh`, `./build.sh`.
+- **unit** (PHP 8.2, 8.3, 8.4, 8.5, 8.6; Magento itself supports up to 8.5): lint (`.php`, `.phtml`), PHPUnit, XML well-formedness, `sh -n demo/entrypoint.sh`, `./build.sh`.
 - **phpstan**: PHPStan on the module's code with Mage-OS's classes, once with Mage-OS 3.6.0 and once with 4.0.0 (see *Code quality and security checks*).
 - **magento** (Mage-OS 3.6.0 and 4.0.0): downloads Mage-OS, installs it with MySQL 8.4 and Elasticsearch 8, adds the module in `app/code`, runs `demo/setup.php` twice (the second run must change nothing, and no password may appear in the log), translates the sample product, category, page and block with `supertext:translate` against the stand-in and checks the store values, URL key and rewrite, page copy with Page Builder markup, block directives, link table and accounts; a second run must skip everything. Then it checks the Commando Center: exactly one `installed` report (plugin, key check `ok`, callback URL; never the key) reached the stand-in's fake center, the state is in the `flag` table, and the storefront's ping (through PHP's built-in server and `phpserver/router.php`) answers the challenge with `Cache-Control: no-store` (400 for a bad challenge).
 
